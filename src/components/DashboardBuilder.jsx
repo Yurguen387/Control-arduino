@@ -40,6 +40,9 @@ export default function DashboardBuilder({
   const [editingWidgetId, setEditingWidgetId] = useState(null);
   const [activeButtonId, setActiveButtonId] = useState(null);
   const [draggableCardId, setDraggableCardId] = useState(null);
+  // Stable refs for event listener handles — prevents memory leaks on re-renders
+  const joystickHandlersRef = useRef({ move: null, up: null });
+  const dialHandlersRef = useRef({ move: null, up: null });
 
   const startEditWidget = (widget) => {
     setEditingWidgetId(widget.id);
@@ -178,6 +181,14 @@ export default function DashboardBuilder({
     const updated = widgets.filter((w) => w.id !== id);
     setWidgets(updated);
     localStorage.setItem(`edu_layout_${activeLesson.id}`, JSON.stringify(updated));
+    // BUG #8 fix: clean up any pending throttle timers for deleted widget
+    if (throttleTimers.current[id]) {
+      clearTimeout(throttleTimers.current[id]);
+      delete throttleTimers.current[id];
+    }
+    if (throttleTimers.current.latestValues) {
+      delete throttleTimers.current.latestValues[id];
+    }
   };
 
   const resetToDefault = () => {
@@ -287,6 +298,9 @@ export default function DashboardBuilder({
         newWidget.currentVal = 90;
       } else if (widgetType === 'joystick') {
         newWidget.payload = widgetPayload || 'J:';
+        // BUG #1 fix: telemetryKey was only in dead-code block below, moved here
+        newWidget.telemetryKey = widgetTelemetryKey || 'joyx';
+        newWidget.telemetryKey2 = widgetTelemetryKey2 || 'joyy';
       } else if (widgetType === 'motor') {
         newWidget.payload = widgetPayload || 'M:';
         newWidget.activeMotorDir = 'S';
@@ -307,9 +321,6 @@ export default function DashboardBuilder({
         newWidget.telemetryKey = widgetTelemetryKey || 'snd';
       } else if (widgetType === 'chart') {
         newWidget.telemetryKey = widgetTelemetryKey;
-      } else if (widgetType === 'joystick') {
-        newWidget.telemetryKey = widgetTelemetryKey || 'joyx';
-        newWidget.telemetryKey2 = widgetTelemetryKey2 || 'joyy';
       }
 
       const updated = [...widgets, newWidget];
@@ -402,45 +413,51 @@ export default function DashboardBuilder({
 
   const startJoystickDrag = (e, id) => {
     if (!isConnected) return;
+
+    // BUG #3 fix: remove any stale listeners before attaching new stable refs
+    if (joystickHandlersRef.current.move) {
+      window.removeEventListener('mousemove', joystickHandlersRef.current.move);
+      window.removeEventListener('mouseup', joystickHandlersRef.current.up);
+      window.removeEventListener('touchmove', joystickHandlersRef.current.move);
+      window.removeEventListener('touchend', joystickHandlersRef.current.up);
+    }
+
     activeJoystickId.current = id;
-    
-    // Bind global move/up handlers
-    window.addEventListener('mousemove', handleJoystickMove);
-    window.addEventListener('mouseup', handleJoystickUp);
-    window.addEventListener('touchmove', handleJoystickMove, { passive: false });
-    window.addEventListener('touchend', handleJoystickUp);
-    
+
+    const moveHandler = (ev) => {
+      if (!activeJoystickId.current) return;
+      if (ev.cancelable) ev.preventDefault();
+      updateJoystickPosition(ev);
+    };
+
+    const upHandler = async () => {
+      const jid = activeJoystickId.current;
+      if (!jid) return;
+
+      const w = widgets.find(widget => widget.id === jid);
+      const prefix = w ? w.payload : 'J:';
+
+      joystickRefs.current[jid] = { x: 0, y: 0 };
+      setWidgets(prev => [...prev]);
+
+      window.removeEventListener('mousemove', joystickHandlersRef.current.move);
+      window.removeEventListener('mouseup', joystickHandlersRef.current.up);
+      window.removeEventListener('touchmove', joystickHandlersRef.current.move);
+      window.removeEventListener('touchend', joystickHandlersRef.current.up);
+      joystickHandlersRef.current = { move: null, up: null };
+
+      activeJoystickId.current = null;
+      await sendData(`${prefix}0,0`);
+    };
+
+    joystickHandlersRef.current = { move: moveHandler, up: upHandler };
+
+    window.addEventListener('mousemove', moveHandler);
+    window.addEventListener('mouseup', upHandler);
+    window.addEventListener('touchmove', moveHandler, { passive: false });
+    window.addEventListener('touchend', upHandler);
+
     updateJoystickPosition(e);
-  };
-
-  const handleJoystickMove = (e) => {
-    if (!activeJoystickId.current) return;
-    if (e.cancelable) e.preventDefault(); // Stop scrolling on mobile
-    updateJoystickPosition(e);
-  };
-
-  const handleJoystickUp = async () => {
-    const id = activeJoystickId.current;
-    if (!id) return;
-
-    // Reset Joystick Puck to center
-    const w = widgets.find(widget => widget.id === id);
-    const prefix = w ? w.payload : 'J:';
-
-    joystickRefs.current[id] = { x: 0, y: 0 };
-    
-    // Force redraw
-    setWidgets(prev => [...prev]);
-
-    window.removeEventListener('mousemove', handleJoystickMove);
-    window.removeEventListener('mouseup', handleJoystickUp);
-    window.removeEventListener('touchmove', handleJoystickMove);
-    window.removeEventListener('touchend', handleJoystickUp);
-    
-    activeJoystickId.current = null;
-    
-    // Transmit centering command
-    await sendData(`${prefix}0,0`);
   };
 
   const updateJoystickPosition = (e) => {
@@ -460,7 +477,7 @@ export default function DashboardBuilder({
     let dx = clientX - centerX;
     let dy = clientY - centerY;
 
-    const maxRadius = 45; // Max drag radius in pixels
+    const maxRadius = 45;
     const distance = Math.sqrt(dx * dx + dy * dy);
 
     if (distance > maxRadius) {
@@ -468,16 +485,13 @@ export default function DashboardBuilder({
       dy = (dy / distance) * maxRadius;
     }
 
-    // Coordinates in scale -100 to 100 (invert y so up is positive)
     const scaleX = Math.round((dx / maxRadius) * 100);
     const scaleY = Math.round(-(dy / maxRadius) * 100);
 
     joystickRefs.current[id] = { x: dx, y: dy };
-    
-    // Force UI render update
     setWidgets(prev => [...prev]);
 
-    // Throttle coords transmission
+    // Throttle coords — always sends the latest captured value
     if (!throttleTimers.current.latestValues) throttleTimers.current.latestValues = {};
     throttleTimers.current.latestValues[id] = { scaleX, scaleY };
 
@@ -495,7 +509,15 @@ export default function DashboardBuilder({
   // Radial Dial handler for Servo
   const handleDialMouseDown = (e, widget) => {
     if (!isConnected) return;
-    
+
+    // BUG #4 fix: remove any stale listeners before attaching new ones
+    if (dialHandlersRef.current.move) {
+      window.removeEventListener('mousemove', dialHandlersRef.current.move);
+      window.removeEventListener('mouseup', dialHandlersRef.current.up);
+      window.removeEventListener('touchmove', dialHandlersRef.current.move);
+      window.removeEventListener('touchend', dialHandlersRef.current.up);
+    }
+
     const dialId = widget.id;
     const handleDialMove = (moveEvent) => {
       const dialEl = document.getElementById(`dial-${dialId}`);
@@ -511,11 +533,8 @@ export default function DashboardBuilder({
       const dx = clientX - centerX;
       const dy = clientY - centerY;
 
-      // Calculate angle in degrees from -180 to 180
       let angle = Math.round((Math.atan2(dy, dx) * 180) / Math.PI);
-      
-      // Map it to a 0-180 degree range (servo standard)
-      let servoAngle = angle + 90; // Rotate 90deg offset so 0 is left/bottom
+      let servoAngle = angle + 90;
       if (servoAngle < 0) servoAngle += 360;
       if (servoAngle > 180) {
         if (servoAngle < 270) servoAngle = 180;
@@ -526,11 +545,14 @@ export default function DashboardBuilder({
     };
 
     const handleDialMouseUp = () => {
-      window.removeEventListener('mousemove', handleDialMove);
-      window.removeEventListener('mouseup', handleDialMouseUp);
-      window.removeEventListener('touchmove', handleDialMove);
-      window.removeEventListener('touchend', handleDialMouseUp);
+      window.removeEventListener('mousemove', dialHandlersRef.current.move);
+      window.removeEventListener('mouseup', dialHandlersRef.current.up);
+      window.removeEventListener('touchmove', dialHandlersRef.current.move);
+      window.removeEventListener('touchend', dialHandlersRef.current.up);
+      dialHandlersRef.current = { move: null, up: null };
     };
+
+    dialHandlersRef.current = { move: handleDialMove, up: handleDialMouseUp };
 
     window.addEventListener('mousemove', handleDialMove);
     window.addEventListener('mouseup', handleDialMouseUp);
@@ -1001,7 +1023,7 @@ export default function DashboardBuilder({
                     <div style={{ display: 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flexGrow: 1, alignItems: 'flex-start' }}>
                         <span className="label-tape yellow" style={{ fontSize: '0.55rem' }}>
-                          📟 {widget.telemetryKey.toUpperCase()}
+                          📟 {(widget.telemetryKey || '???').toUpperCase()}
                         </span>
                         <div className="lcd-display" style={{ fontSize: '1.2rem', padding: '0.4rem 0.8rem', marginTop: '0.2rem' }}>
                           {telemetryData && telemetryData[widget.telemetryKey] !== undefined 

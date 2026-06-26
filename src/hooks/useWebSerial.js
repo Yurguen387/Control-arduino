@@ -24,12 +24,8 @@ export function useWebSerial(onTelemetryReceived) {
     localStorage.setItem('edu_baud_rate', String(baud));
   };
 
-  useEffect(() => {
-    if (isConnected) return;
-    const defaultBaud = 9600;
-    setBaudRateState(defaultBaud);
-    localStorage.setItem('edu_baud_rate', String(defaultBaud));
-  }, [connectionType, isConnected]);
+  // NOTE: baudRate is intentionally NOT reset when connectionType changes.
+  // The user's saved preference is preserved across connection type switches.
 
   const isSupported = typeof window !== 'undefined' && 'serial' in navigator;
 
@@ -209,12 +205,12 @@ export function useWebSerial(onTelemetryReceived) {
   };
 
   // Send data through serial (or simulated)
-  const sendData = async (text, terminator = '\r\n') => {
+  const sendData = async (text, terminator = '\n') => {
     let formattedText = String(text);
-    if (terminator === '\\n' || terminator === '\n') formattedText += '\n';
-    else if (terminator === '\\r' || terminator === '\r') formattedText += '\r';
-    else if (terminator === '\\r\\n' || terminator === '\r\n') formattedText += '\r\n';
-    else if (terminator !== 'none' && terminator !== '') formattedText += terminator;
+    // Append terminator unless explicitly disabled
+    if (terminator !== 'none' && terminator !== '') {
+      formattedText += terminator;
+    }
 
     addLog('out', text);
 
@@ -226,9 +222,10 @@ export function useWebSerial(onTelemetryReceived) {
           addLog('in', 'MSG:LED Encendido');
         } else if (command === '0' || command === 'LED_OFF') {
           addLog('in', 'MSG:LED Apagado');
-        } else if (command.startsWith('SERVO:')) {
-          const val = command.split(':')[1];
-          addLog('in', `MSG:Servo angulo ${val}`);
+        } else if (command.startsWith('SERVO:') || /^[A-Z].*\d+$/.test(command)) {
+          // Generic servo/slider simulation: any prefix+number pattern
+          const val = command.replace(/[^0-9]/g, '') || '?';
+          addLog('in', `MSG:Actuador -> ${val}`);
         } else {
           addLog('in', `ECHO: ${command}`);
         }
