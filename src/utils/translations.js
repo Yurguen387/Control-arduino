@@ -100,7 +100,7 @@ export const translations = {
     typeRadar: "Radar Ultrasónico HC-SR04 (Distancia)",
     typeDHT11: "Sensor Clima DHT11 (Temp/Hum)",
     typeServoKnob: "Perilla de Servomotor (Giro radial)",
-    typeIRIndicator: "Detector Infrarrojo (Obstáculo)",
+    typeIRIndicator: "Luz Indicadora (Dato digital ON/OFF)",
     typeSoundVU: "Loudness VU Meter (KY-038 Sonido)",
     typeMotorDriver: "Control de Motores L298N (Dirección)",
 
@@ -283,7 +283,7 @@ export const translations = {
     typeRadar: "Ultrasonic Radar HC-SR04 (Distance)",
     typeDHT11: "DHT11 Climate Sensor (Temp/Hum)",
     typeServoKnob: "Servo Knob (Radial rotation)",
-    typeIRIndicator: "Infrared Detector (Obstacle)",
+    typeIRIndicator: "Digital Light Indicator (ON/OFF state)",
     typeSoundVU: "Loudness VU Meter (KY-038 Sound)",
     typeMotorDriver: "L298N Motor Driver (Direction)",
 

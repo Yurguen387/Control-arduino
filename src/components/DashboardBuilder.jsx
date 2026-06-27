@@ -39,7 +39,6 @@ export default function DashboardBuilder({
   const dragStartFromHeader = useRef(false);
   const [editingWidgetId, setEditingWidgetId] = useState(null);
   const [activeButtonId, setActiveButtonId] = useState(null);
-  const [draggableCardId, setDraggableCardId] = useState(null);
   // Stable refs for event listener handles — prevents memory leaks on re-renders
   const joystickHandlersRef = useRef({ move: null, up: null });
   const dialHandlersRef = useRef({ move: null, up: null });
@@ -332,6 +331,11 @@ export default function DashboardBuilder({
 
   // HTML5 Drag and Drop Handlers for Swapping Position
   const handleDragStart = (e, id) => {
+    // Only allow dragging if started from the header drag handle
+    if (!e.target.closest('.widget-header')) {
+      e.preventDefault();
+      return;
+    }
     setDraggedId(id);
     e.dataTransfer.effectAllowed = "move";
   };
@@ -755,7 +759,6 @@ export default function DashboardBuilder({
               );
             }
             
-            // Occupied slot (Widget)
             const accentColor = widget.color || 'var(--clr-cyan)';
             return (
               <div 
@@ -771,13 +774,12 @@ export default function DashboardBuilder({
                   gap: '0.3rem',
                   padding: '0.85rem'
                 }}
-                draggable={draggableCardId === widget.id}
+                draggable={true}
                 onDragStart={(e) => handleDragStart(e, widget.id)}
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDropOnWidget(e, widget)}
                 onDragEnd={() => {
                   setDraggedId(null);
-                  setDraggableCardId(null);
                 }}
               >
                 {/* Rivets decoration */}
@@ -790,8 +792,6 @@ export default function DashboardBuilder({
                 <div 
                   className="widget-header" 
                   style={{ cursor: 'grab', background: 'rgba(0,0,0,0.2)', padding: '0.2rem', borderRadius: '4px' }}
-                  onMouseEnter={() => setDraggableCardId(widget.id)}
-                  onMouseLeave={() => setDraggableCardId(null)}
                 >
                   <span className="widget-title" style={{ fontSize: '0.85rem', fontWeight: 600 }}>
                     {renderIcon(widget.icon, accentColor)}
@@ -921,7 +921,7 @@ export default function DashboardBuilder({
                         </svg>
                       </div>
                       <div className={`label-tape ${widget.isToggled ? 'green' : 'yellow'}`} style={{ marginTop: '0.2rem' }}>
-                        💡 {widget.isToggled ? 'ON' : 'OFF'} ({widget.payload})
+                        🚀 {widget.isToggled ? widget.payload : widget.payloadOff}
                       </div>
                     </div>
                   )}
@@ -934,7 +934,7 @@ export default function DashboardBuilder({
                           📟 {widget.currentVal !== undefined ? widget.currentVal : widget.min}
                         </div>
                         <div className="label-tape" style={{ fontSize: '0.6rem' }}>
-                          {widget.payload}
+                          🚀 {widget.payload}{widget.currentVal !== undefined ? widget.currentVal : widget.min}
                         </div>
                       </div>
                       <div style={{ width: '100%', padding: '0 0.5rem', display: 'flex', alignItems: 'center', position: 'relative', height: '40px' }}>
@@ -1340,7 +1340,7 @@ export default function DashboardBuilder({
                                 <div>Y: {labelY}</div>
                               </div>
                               <span style={{ fontSize: '0.55rem', color: 'var(--txt-muted)' }}>
-                                {isPhysical ? 'Modo: FÍSICO' : `Prefijo: ${widget.payload}`}
+                                {isPhysical ? 'Modo: FÍSICO' : `🚀 ${widget.payload}${labelX},${labelY}`}
                               </span>
                             </div>
                             
@@ -1415,7 +1415,10 @@ export default function DashboardBuilder({
                                   transition: 'all 0.2s'
                                 }} />
                                 <span style={{ fontSize: '0.75rem', fontWeight: 600, color: active ? 'var(--clr-red)' : 'var(--txt-muted)' }}>
-                                  {active ? '¡OBSTÁCULO!' : 'LIBRE'}
+                                  {widget.telemetryKey === 'ir'
+                                    ? (active ? '¡OBSTÁCULO!' : 'LIBRE')
+                                    : (active ? 'ACTIVO (1)' : 'INACTIVO (0)')
+                                  }
                                 </span>
                               </div>
                               <span style={{ fontSize: '0.65rem', color: 'var(--txt-muted)', alignSelf: 'center' }}>Clave: {widget.telemetryKey}</span>
@@ -1538,7 +1541,9 @@ export default function DashboardBuilder({
                         <b style={{ color: accentColor, fontSize: '1.2rem', textShadow: `0 0 6px ${accentColor}` }}>
                           {widget.currentVal !== undefined ? `${widget.currentVal}°` : '90°'}
                         </b>
-                        <span style={{ fontSize: '0.65rem', color: 'var(--txt-muted)' }}>Arrastra el aspa</span>
+                        <div className="label-tape" style={{ fontSize: '0.55rem', display: 'inline-block', maxWidth: 'max-content', marginTop: '0.2rem' }}>
+                          🚀 {widget.payload}{widget.currentVal !== undefined ? widget.currentVal : 90}
+                        </div>
                       </div>
                       
                       <div 
@@ -1701,15 +1706,10 @@ export default function DashboardBuilder({
                   <option value="button">{t.typeButton}</option>
                   <option value="toggle">{t.typeToggle}</option>
                   <option value="slider">{t.typeSlider}</option>
-                  <option value="servo_knob">{t.typeServoKnob}</option>
                   <option value="joystick">{t.typeJoystick}</option>
                   <option value="gauge">{t.typeGauge}</option>
                   <option value="chart">{t.typeChart}</option>
-                  <option value="motor">{t.typeMotorDriver}</option>
-                  <option value="radar">{t.typeRadar}</option>
-                  <option value="dht11">{t.typeDHT11}</option>
                   <option value="ir">{t.typeIRIndicator}</option>
-                  <option value="sound">{t.typeSoundVU}</option>
                 </select>
               </div>
 
