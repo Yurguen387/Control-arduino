@@ -207,9 +207,15 @@ export function useWebSerial(onTelemetryReceived) {
   // Send data through serial (or simulated)
   const sendData = async (text, terminator = '\n') => {
     let formattedText = String(text);
-    // Append terminator unless explicitly disabled
-    if (terminator !== 'none' && terminator !== '') {
-      formattedText += terminator;
+    let resolvedTerminator = terminator;
+
+    // Resolve double-escaped string representations from UI select options
+    if (resolvedTerminator === '\\n') resolvedTerminator = '\n';
+    else if (resolvedTerminator === '\\r') resolvedTerminator = '\r';
+    else if (resolvedTerminator === '\\r\\n') resolvedTerminator = '\r\n';
+
+    if (resolvedTerminator !== 'none' && resolvedTerminator !== '') {
+      formattedText += resolvedTerminator;
     }
 
     addLog('out', text);
