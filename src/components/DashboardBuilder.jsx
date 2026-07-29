@@ -332,7 +332,7 @@ export default function DashboardBuilder({
   // HTML5 Drag and Drop Handlers for Swapping Position
   const handleDragStart = (e, id) => {
     // Only allow dragging if started from the header drag handle
-    if (!e.target.closest('.widget-header')) {
+    if (!dragStartFromHeader.current) {
       e.preventDefault();
       return;
     }
@@ -440,6 +440,15 @@ export default function DashboardBuilder({
 
       const w = widgets.find(widget => widget.id === jid);
       const prefix = w ? w.payload : 'J:';
+
+      // Cancel any scheduled throttle timers to prevent trailing movement events
+      if (throttleTimers.current[jid]) {
+        clearTimeout(throttleTimers.current[jid]);
+        delete throttleTimers.current[jid];
+      }
+      if (throttleTimers.current.latestValues) {
+        delete throttleTimers.current.latestValues[jid];
+      }
 
       joystickRefs.current[jid] = { x: 0, y: 0 };
       setWidgets(prev => [...prev]);
@@ -780,6 +789,7 @@ export default function DashboardBuilder({
                 onDrop={(e) => handleDropOnWidget(e, widget)}
                 onDragEnd={() => {
                   setDraggedId(null);
+                  dragStartFromHeader.current = false;
                 }}
               >
                 {/* Rivets decoration */}
@@ -792,6 +802,8 @@ export default function DashboardBuilder({
                 <div 
                   className="widget-header" 
                   style={{ cursor: 'grab', background: 'rgba(0,0,0,0.2)', padding: '0.2rem', borderRadius: '4px' }}
+                  onMouseDown={() => { dragStartFromHeader.current = true; }}
+                  onTouchStart={() => { dragStartFromHeader.current = true; }}
                 >
                   <span className="widget-title" style={{ fontSize: '0.85rem', fontWeight: 600 }}>
                     {renderIcon(widget.icon, accentColor)}

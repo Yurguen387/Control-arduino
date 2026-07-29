@@ -183,10 +183,16 @@ void processCommand() {
     Serial.print("MSG:Servo girado a ");
     Serial.println(angulo);
   }
-  else if (data.startsWith("J:")) {
+  else if (data.indexOf(',') != -1) {
+    int colonIdx = data.indexOf(':');
     int commaIdx = data.indexOf(',');
     if (commaIdx != -1) {
-      int x = data.substring(2, commaIdx).toInt();
+      int startIdx = (colonIdx != -1) ? (colonIdx + 1) : 0;
+      // Skip prefix characters to find the start of X coordinate value
+      while (startIdx < commaIdx && !isDigit(data.charAt(startIdx)) && data.charAt(startIdx) != '-') {
+        startIdx++;
+      }
+      int x = data.substring(startIdx, commaIdx).toInt();
       int y = data.substring(commaIdx + 1).toInt();
       
       if (y > 40) moverAdelante();
