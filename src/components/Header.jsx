@@ -57,8 +57,8 @@ export default function Header({
               className="form-input"
               style={{ height: '38px', padding: '0 2rem 0 0.75rem', backgroundPosition: 'right 0.5rem center', cursor: 'pointer' }}
             >
-              <option value="usb">🔌 USB (Cable)</option>
-              <option value="bluetooth">📶 Bluetooth</option>
+              <option value="usb">USB (Cable)</option>
+              <option value="bluetooth">Bluetooth</option>
             </select>
           </div>
         )}
@@ -115,8 +115,7 @@ export default function Header({
               position: 'absolute',
               top: '2px',
               left: isSimulated ? '18px' : '2px',
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              boxShadow: isSimulated ? '0 0 6px var(--clr-purple)' : 'none'
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
             }} />
           </div>
         </div>
@@ -133,8 +132,15 @@ export default function Header({
             {isConnected ? t.disconnect : t.connect}
           </button>
         ) : (
-          <div className="badge" style={{ color: 'var(--clr-red)', background: 'rgba(255,51,102,0.1)', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid var(--clr-red)' }}>
-            {t.notSupported}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-start' }}>
+            <div className="badge" style={{ color: 'var(--clr-red)', background: 'rgba(255,51,102,0.1)', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid var(--clr-red)' }}>
+              {t.notSupported}
+            </div>
+            {connectionType === 'bluetooth' && /iPad|iPhone|iPod/.test(navigator.userAgent) && (
+              <span style={{ fontSize: '0.65rem', color: 'var(--clr-yellow)', maxWidth: '200px', lineHeight: '1.2' }}>
+                Apple bloquea el Bluetooth en Safari. Para usarlo en iOS, instala la app gratuita "Bluefy".
+              </span>
+            )}
           </div>
         )}
 

@@ -85,7 +85,7 @@ export default function ATConfigurator({
       
       resetTimeout(4000, [
         'Error: Tiempo de espera agotado respondiendo AT.',
-        '🔍 LISTA DE COMPROBACIÓN:',
+        ' LISTA DE COMPROBACIÓN:',
         '• ¿El LED del HC-06 parpadea rápido? Si está fijo, desconéctalo de tu celular o tableta.',
         '• ¿El módulo es versión nueva? Intenta cambiar el "Tipo de Módulo" a "HC-06 Nuevo / HC-05 (CRLF)".',
         '• ¿Subiste el boceto en blanco en el Paso 1 ANTES de conectar los cables?',
@@ -193,7 +193,7 @@ export default function ATConfigurator({
     };
   }, []);
 
-  const totalSteps = 4;
+    const totalSteps = 3;
 
   return (
     <div className="glass-panel animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -220,7 +220,7 @@ export default function ATConfigurator({
 
       {/* Stepper Progress */}
       <div style={{ display: 'flex', gap: '0.5rem', background: 'rgba(0,0,0,0.15)', padding: '0.5rem', borderRadius: '12px' }}>
-        {[1, 2, 3, 4].map(step => (
+        {[1, 2, 3].map(step => (
           <div 
             key={step} 
             style={{ 
@@ -281,95 +281,73 @@ export default function ATConfigurator({
           </div>
         )}
 
-        {/* STEP 2: Wiring */}
+        {/* STEP 2: Wiring and USB Connection */}
         {activeStep === 2 && (
           <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--clr-cyan)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Info size={18} />
-              Paso 2: Conectar los Cables
+              Paso 2: Cablear y Conectar a la PC
             </h3>
             <p style={{ fontSize: '0.85rem', color: 'var(--txt-secondary)' }}>
-              Una vez que el código en blanco se haya subido con éxito al Arduino, ahora sí conecta el módulo Bluetooth siguiendo este esquema. <strong>El LED del Bluetooth debe parpadear rápido.</strong>
+              Conecta el módulo Bluetooth siguiendo este esquema. <strong>El LED del Bluetooth debe parpadear rápido.</strong> Luego, conecta esta aplicación por USB.
             </p>
             
             <div className="connection-box">
               <table style={{ width: '100%', fontSize: '0.85rem', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', textAlign: 'left' }}>
-                    <th style={{ padding: '8px', color: 'var(--txt-muted)' }}>Pin en Arduino</th>
-                    <th style={{ padding: '8px', color: 'var(--txt-muted)' }}>Pin en Bluetooth (HC-06)</th>
+                    <th style={{ padding: '8px', color: 'var(--txt-muted)' }}>Arduino</th>
+                    <th style={{ padding: '8px', color: 'var(--txt-muted)' }}>Bluetooth</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <td style={{ padding: '8px' }}><span className="highlight-pin pin-vcc">5V</span></td>
-                    <td style={{ padding: '8px' }}><span className="highlight-pin pin-vcc">VCC</span></td>
+                    <td style={{ padding: '4px 8px' }}><span className="highlight-pin pin-vcc">5V</span></td>
+                    <td style={{ padding: '4px 8px' }}><span className="highlight-pin pin-vcc">VCC</span></td>
                   </tr>
                   <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <td style={{ padding: '8px' }}><span className="highlight-pin pin-gnd">GND</span></td>
-                    <td style={{ padding: '8px' }}><span className="highlight-pin pin-gnd">GND</span></td>
+                    <td style={{ padding: '4px 8px' }}><span className="highlight-pin pin-gnd">GND</span></td>
+                    <td style={{ padding: '4px 8px' }}><span className="highlight-pin pin-gnd">GND</span></td>
                   </tr>
                   <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <td style={{ padding: '8px' }}><span className="highlight-pin pin-rx">Pin 0 (RX)</span></td>
-                    <td style={{ padding: '8px' }}>RXD</td>
+                    <td style={{ padding: '4px 8px' }}><span className="highlight-pin pin-rx">Pin 0 (RX)</span></td>
+                    <td style={{ padding: '4px 8px' }}>RXD</td>
                   </tr>
                   <tr>
-                    <td style={{ padding: '8px' }}><span className="highlight-pin pin-tx">Pin 1 (TX)</span></td>
-                    <td style={{ padding: '8px' }}>TXD</td>
+                    <td style={{ padding: '4px 8px' }}><span className="highlight-pin pin-tx">Pin 1 (TX)</span></td>
+                    <td style={{ padding: '4px 8px' }}>TXD</td>
                   </tr>
                 </tbody>
               </table>
             </div>
-            
-            <div style={{ padding: '0.75rem', background: 'rgba(0, 242, 254, 0.05)', borderRadius: '8px', border: '1px solid rgba(0, 242, 254, 0.2)' }}>
-              <span style={{ fontSize: '0.8rem', color: 'var(--clr-cyan)', display: 'block', marginBottom: '0.25rem', fontWeight: 'bold' }}>Nota de Cableado Directo:</span>
-              <span style={{ fontSize: '0.8rem', color: 'var(--txt-secondary)' }}>Para enviar comandos AT, conectamos RX con RX y TX con TX directamente para que la computadora hable con el módulo pasando de largo el microcontrolador.</span>
-            </div>
-          </div>
-        )}
 
-        {/* STEP 3: Connect to USB */}
-        {activeStep === 3 && (
-          <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--clr-green)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Power size={18} />
-              Paso 3: Conectar a la Aplicación
-            </h3>
-            <p style={{ fontSize: '0.85rem', color: 'var(--txt-secondary)', lineHeight: '1.5' }}>
-              Para enviarle la nueva configuración al módulo, necesitamos conectar esta aplicación a tu Arduino a través del cable USB.
-            </p>
-
-            <div className="connection-box" style={{ alignItems: 'center', padding: '2rem', textAlign: 'center' }}>
+            <div className="connection-box" style={{ alignItems: 'center', padding: '1.5rem', textAlign: 'center', background: 'rgba(0,0,0,0.2)' }}>
               {!isConnected ? (
                 <>
-                  <div style={{ marginBottom: '1rem' }}>
-                    <h4 style={{ fontSize: '1rem', color: 'var(--txt-primary)' }}>Conecta tu Puerto Serial</h4>
-                    <span style={{ fontSize: '0.85rem', color: 'var(--txt-muted)' }}>El tipo de conexión se forzará a USB automáticamente.</span>
-                  </div>
                   <button 
                     onClick={handleConnectUSB}
                     className="btn btn-primary"
                     style={{ fontSize: '1rem', padding: '0.75rem 2rem', gap: '0.5rem' }}
                   >
                     <Power size={18} />
-                    Conectar por USB
+                    Conectar App por USB
                   </button>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--txt-muted)', marginTop: '0.5rem', display: 'block' }}>Para poder enviar los comandos al módulo.</span>
                 </>
               ) : (
                 <>
-                  <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(19, 209, 141, 0.2)', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '1rem' }}>
-                    <Check size={24} color="var(--clr-green)" />
+                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(19, 209, 141, 0.2)', display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '0 auto 0.5rem' }}>
+                    <Check size={20} color="var(--clr-green)" />
                   </div>
-                  <h4 style={{ fontSize: '1.1rem', color: 'var(--clr-green)' }}>¡Conectado Exitosamente!</h4>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--txt-muted)' }}>Ya puedes pasar al último paso.</span>
+                  <h4 style={{ fontSize: '1rem', color: 'var(--clr-green)' }}>¡App Conectada!</h4>
                 </>
               )}
             </div>
           </div>
         )}
 
-        {/* STEP 4: Configuration Form */}
-        {activeStep === 4 && (
+        {/* STEP 3: Configuration Form */}
+        {activeStep === 3 && (
           <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Sparkles size={18} color="var(--clr-yellow)" />
@@ -500,7 +478,7 @@ export default function ATConfigurator({
         {activeStep < totalSteps ? (
           <button
             onClick={() => setActiveStep(prev => Math.min(totalSteps, prev + 1))}
-            disabled={(activeStep === 3 && !isConnected)} // Block going to step 4 if not connected
+            disabled={(activeStep === 2 && !isConnected)} // Block going to step 3 if not connected
             className="btn btn-primary"
             style={{ height: '36px', fontSize: '0.85rem', gap: '0.3rem' }}
           >

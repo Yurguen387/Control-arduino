@@ -100,23 +100,25 @@ export const lessonsDatabase = {
       ],
       recommendedWidgets: [
         {
-          id: 'w_radar_gauge',
-          type: 'radar',
-          title: 'Radar de Distancia',
+          id: 'w_dist_gauge',
+          type: 'gauge',
+          title: 'Distancia (Ultrasonido)',
           telemetryKey: 'd',
           min: 0,
-          max: 150,
+          max: 200,
           color: 'var(--clr-cyan)',
           icon: 'activity'
         },
         {
           id: 'w_servo_rotary',
-          type: 'servo_knob',
-          title: 'Girar Radar (Servo)',
+          type: 'knob',
+          title: 'Control de Ángulo',
           payload: 'SERVO:',
           color: 'var(--clr-purple)',
           icon: 'sliders',
-          currentVal: 90
+          currentVal: 0,
+          min: 0,
+          max: 180
         }
       ],
       commonErrors: [
@@ -179,13 +181,14 @@ export const lessonsDatabase = {
       ],
       recommendedWidgets: [
         {
-          id: 'w_wheels',
-          type: 'motor',
-          title: 'Tracción de Ruedas',
-          payload: 'M:',
+          id: 'w_motor_speed',
+          type: 'slider',
+          title: 'Velocidad Motor',
+          payload: 'PWM:',
+          min: 0,
+          max: 255,
           color: 'var(--clr-yellow)',
-          icon: 'sliders',
-          activeMotorDir: 'S'
+          icon: 'sliders'
         },
         {
           id: 'w_joystick_pad',

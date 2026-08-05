@@ -141,7 +141,15 @@ export default function SerialMonitor({
           </div>
         )}
         
-        {logs.map((log, index) => {
+        {logs
+          .filter(log => {
+            // Ocultar strings de telemetría automática para mantener el serial "vacío"
+            if (log.type === 'in' && log.text.startsWith('d:') && log.text.includes('temp:')) {
+              return false;
+            }
+            return true;
+          })
+          .map((log, index) => {
           let prefix = '';
           let classDir = '';
           

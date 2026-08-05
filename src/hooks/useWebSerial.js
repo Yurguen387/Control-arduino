@@ -34,6 +34,10 @@ export function useWebSerial(onTelemetryReceived) {
   const keepReadingRef = useRef(false);
   const simulationIntervalRef = useRef(null);
   
+  // Buffers for reading chunks
+  const bufferRef = useRef('');
+  const flushTimeoutRef = useRef(null);
+  
   // Callback ref to always use the latest telemetry callback without re-running effects
   const onTelemetryRef = useRef(onTelemetryReceived);
   useEffect(() => {
@@ -147,14 +151,27 @@ export function useWebSerial(onTelemetryReceived) {
             }
             
             // Decode chunk and append to buffer
-            buffer += decoder.decode(value, { stream: true });
+            bufferRef.current += decoder.decode(value, { stream: true });
+            
+            // Clear existing flush timeout
+            if (flushTimeoutRef.current) clearTimeout(flushTimeoutRef.current);
             
             // Process complete lines
             let newlineIndex;
-            while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
-              const line = buffer.substring(0, newlineIndex);
-              buffer = buffer.substring(newlineIndex + 1);
+            while ((newlineIndex = bufferRef.current.indexOf('\n')) !== -1) {
+              const line = bufferRef.current.substring(0, newlineIndex);
+              bufferRef.current = bufferRef.current.substring(newlineIndex + 1);
               processIncomingLine(line);
+            }
+            
+            // If there's data left but no newline, set a timeout to flush it
+            if (bufferRef.current.length > 0) {
+              flushTimeoutRef.current = setTimeout(() => {
+                if (bufferRef.current.length > 0) {
+                  processIncomingLine(bufferRef.current);
+                  bufferRef.current = '';
+                }
+              }, 150);
             }
           }
         } catch (error) {
@@ -280,33 +297,11 @@ export function useWebSerial(onTelemetryReceived) {
       setIsSimulated(true);
       setIsConnected(true);
       setPortName('Simulated Arduino Board');
-      addLog('sys', 'Simulation mode activated. Generating dummy telemetry.');
+      addLog('sys', 'Simulation mode activated. Esperando comandos...');
 
       // Start dummy telemetry generation
-      let counter = 0;
-      simulationIntervalRef.current = setInterval(() => {
-        counter += 0.25;
-        
-        // Ultrasonic distance sweeping (10cm to 150cm) to trigger radar/alerts
-        const d = Math.round(80 + Math.sin(counter * 0.6) * 70);
-        
-        // Temperature (20C to 25C) & Humidity (40% to 60%)
-        const temp = (22.5 + Math.sin(counter * 0.1) * 2.5 + Math.random() * 0.15).toFixed(1);
-        const hum = Math.round(50 + Math.cos(counter * 0.15) * 10 + Math.random() * 1);
-        
-        // IR Obstacle (1 = obstacle detected, 0 = free)
-        const ir = (Math.sin(counter * 0.4) > 0.75) ? 1 : 0;
-        
-        // Sound volume (KY-038 KY loudness index 10 to 90)
-        const snd = Math.round(35 + Math.sin(counter * 1.8) * 25 + Math.random() * 10);
-        
-        // Joystick physical pins
-        const joyx = Math.round(512 + Math.sin(counter) * 350);
-        const joyy = Math.round(512 + Math.cos(counter) * 350);
-        
-        const line = `d:${d},temp:${temp},hum:${hum},ir:${ir},snd:${snd},joyx:${joyx},joyy:${joyy}`;
-        processIncomingLine(line);
-      }, 750);
+      // The user requested NO random data in simulation mode. It should just respond to dashboard commands.
+      // (The dummy response logic is handled inside sendData).
     } else {
       if (simulationIntervalRef.current) {
         clearInterval(simulationIntervalRef.current);

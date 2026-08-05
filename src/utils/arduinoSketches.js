@@ -45,7 +45,7 @@ void loop() {
  * 
  * CONEXIÓN DE COMPONENTES:
  * 1. Bluetooth HC-06 (Modo Crossover): RXD->Pin 1 (TX Arduino), TXD->Pin 0 (RX Arduino), VCC->5V, GND->GND
- *    ⚠️ ¡MUY IMPORTANTE!: Desconecta el cable VCC (alimentación) o RX/TX del Bluetooth antes de
+ *     ¡MUY IMPORTANTE!: Desconecta el cable VCC (alimentación) o RX/TX del Bluetooth antes de
  *    subir este código por USB o de lo contrario dará error de carga (avrdude sync error).
  * 2. DHT11 (Clima): Pin Datos -> Pin Digital 4
  * 3. HC-SR04 (Ultrasonido): Trig -> Pin Digital 7, Echo -> Pin Digital 8
@@ -243,12 +243,8 @@ void sendTelemetry() {
   int sonido = analogRead(A2);
   int volumen = map(sonido, 0, 1023, 0, 100);
 
-  // E. Leer Joystick físico (Pines A0 y A1)
-  int joyFisicoX = analogRead(A0);
-  int joyFisicoY = analogRead(A1);
-
   // F. Formatear y enviar evitando fragmentación de String
-  char buffer[120];
+  char buffer[100];
   char tempStr[8];
   char humStr[8];
   char distStr[8];
@@ -258,8 +254,8 @@ void sendTelemetry() {
   dtostrf(hum, 4, 1, humStr);
   dtostrf(distancia, 4, 1, distStr);
 
-  sprintf(buffer, "d:%s,temp:%s,hum:%s,ir:%d,snd:%d,joyx:%d,joyy:%d",
-          distStr, tempStr, humStr, obstaculo, volumen, joyFisicoX, joyFisicoY);
+  sprintf(buffer, "d:%s,temp:%s,hum:%s,ir:%d,snd:%d",
+          distStr, tempStr, humStr, obstaculo, volumen);
 
   Serial.println(buffer);
 }

@@ -117,31 +117,11 @@ export default function ConnectionGuide({ t, activeLesson, connectionType, lang,
                   </p>
                 </div>
 
-                {/* Bluetooth Configuration Warning Box */}
-                <div style={{
-                  background: 'rgba(255, 232, 112, 0.08)',
-                  border: '1.5px solid var(--clr-yellow)',
-                  borderRadius: '10px',
-                  padding: '1rem',
-                  display: 'flex',
-                  gap: '0.75rem',
-                  alignItems: 'flex-start'
-                }}>
-                  <AlertCircle size={20} color="var(--clr-yellow)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                  <div>
-                    <h4 style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--clr-yellow)', marginBottom: '0.25rem' }}>
-                      {t.btWarningTitle}
-                    </h4>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--txt-secondary)', lineHeight: '1.4' }}>
-                      {t.btWarningDesc}
-                    </p>
-                  </div>
-                </div>
 
                 {/* Pin Metaphor Explorers */}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
                   <span style={{ fontSize: '0.75rem', color: 'var(--txt-muted)', fontWeight: 600, display: 'block', width: '100%', marginBottom: '0.2rem' }}>
-                    💡 Toca cada pin para descubrir qué significa en nuestro circuito:
+                     Toca cada pin para descubrir qué significa en nuestro circuito:
                   </span>
                   <button onClick={() => showMetaphor('VCC')} className="badge cursor-pointer" style={{ background: 'rgba(255, 51, 102, 0.1)', color: 'var(--clr-red)', border: '1px solid rgba(255, 51, 102, 0.2)', cursor: 'pointer' }}>VCC (Alimentación)</button>
                   <button onClick={() => showMetaphor('GND')} className="badge cursor-pointer" style={{ background: 'rgba(255, 255, 255, 0.08)', color: '#fff', border: '1px solid rgba(255, 255, 255, 0.15)', cursor: 'pointer' }}>GND (Tierra)</button>
@@ -204,27 +184,27 @@ export default function ConnectionGuide({ t, activeLesson, connectionType, lang,
                       <div style={{ background: '#122035', border: '1.5px solid var(--clr-blue)', borderRadius: '8px', padding: '0.4rem 0.8rem', textAlign: 'center', minWidth: '95px' }}>
                         <span style={{ fontSize: '0.7rem', color: 'var(--clr-blue)', fontWeight: 'bold', textTransform: 'uppercase' }}>Cerebro</span>
                         <div style={{ fontSize: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.4rem', textAlign: 'left' }}>
-                          <div style={{ color: 'var(--clr-red)' }}>🔴 5V</div>
-                          <div style={{ color: '#fff' }}>⚪ GND</div>
-                          <div style={{ color: 'var(--clr-cyan)' }}>🔵 Pin 0 (RX)</div>
-                          <div style={{ color: 'var(--clr-yellow)' }}>🟡 Pin 1 (TX)</div>
+                          <div style={{ color: 'var(--clr-red)' }}> 5V</div>
+                          <div style={{ color: '#fff' }}> GND</div>
+                          <div style={{ color: 'var(--clr-cyan)' }}> Pin 0 (RX)</div>
+                          <div style={{ color: 'var(--clr-yellow)' }}> Pin 1 (TX)</div>
                         </div>
                       </div>
 
                       {/* Wires */}
                       <div className="diagram-arrows" style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', color: 'var(--txt-muted)', fontSize: '0.7rem' }}>
-                        <div className="diagram-arrow">───▶</div>
-                        <div className="diagram-arrow">◀───</div>
+                        <div className="diagram-arrow">───</div>
+                        <div className="diagram-arrow">───</div>
                       </div>
 
                       {/* HC-06 Card */}
                       <div style={{ background: '#141c28', border: '1.5px solid var(--clr-cyan)', borderRadius: '8px', padding: '0.4rem 0.8rem', textAlign: 'center', minWidth: '95px' }}>
                         <span style={{ fontSize: '0.7rem', color: 'var(--clr-cyan)', fontWeight: 'bold', textTransform: 'uppercase' }}>Bluetooth</span>
                         <div style={{ fontSize: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.4rem', textAlign: 'left' }}>
-                          <div style={{ color: 'var(--clr-red)' }}>VCC 🔴</div>
-                          <div style={{ color: '#fff' }}>GND ⚪</div>
-                          <div style={{ color: 'var(--clr-cyan)' }}>TXD 🔵</div>
-                          <div style={{ color: 'var(--clr-yellow)' }}>RXD 🟡</div>
+                          <div style={{ color: 'var(--clr-red)' }}>VCC </div>
+                          <div style={{ color: '#fff' }}>GND </div>
+                          <div style={{ color: 'var(--clr-cyan)' }}>TXD </div>
+                          <div style={{ color: 'var(--clr-yellow)' }}>RXD </div>
                         </div>
                       </div>
 
@@ -233,25 +213,7 @@ export default function ConnectionGuide({ t, activeLesson, connectionType, lang,
 
                 </div>
 
-                {/* Protective Shield Caution */}
-                <div style={{
-                  background: 'rgba(255, 51, 102, 0.06)',
-                  border: '1px solid rgba(255, 51, 102, 0.3)',
-                  borderRadius: '8px',
-                  padding: '0.75rem',
-                  display: 'flex',
-                  gap: '0.75rem'
-                }}>
-                  <AlertCircle size={18} color="var(--clr-red)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                  <div>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--clr-red)', display: 'block', marginBottom: '0.2rem' }}>
-                      🛡️ ¡Usa el Escudo Protector! (Divisor de Voltaje)
-                    </span>
-                    <p style={{ fontSize: '0.75rem', color: 'var(--txt-secondary)', lineHeight: '1.4' }}>
-                      {t.gStep1Caution}
-                    </p>
-                  </div>
-                </div>
+
               </div>
             )}
 
@@ -271,7 +233,7 @@ export default function ConnectionGuide({ t, activeLesson, connectionType, lang,
                 <div className="connection-box">
                   <div style={{ marginBottom: '1.25rem', padding: '1rem', background: 'rgba(157, 78, 221, 0.1)', border: '1px solid var(--clr-purple)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                     <h4 style={{ fontSize: '0.9rem', color: 'var(--clr-purple)', fontWeight: 'bold' }}>
-                      {lang === 'es' ? '⚙️ Opcional: Configurar Módulo Bluetooth' : '⚙️ Optional: Configure Bluetooth Module'}
+                      {lang === 'es' ? ' Opcional: Configurar Módulo Bluetooth' : ' Optional: Configure Bluetooth Module'}
                     </h4>
                     <p style={{ fontSize: '0.8rem', color: 'var(--txt-secondary)', lineHeight: '1.4' }}>
                       {lang === 'es' 
@@ -314,7 +276,7 @@ export default function ConnectionGuide({ t, activeLesson, connectionType, lang,
                 <div className="wiring-grid">
                   <div className="connection-box">
                     <h4 style={{ fontSize: '0.85rem', color: 'var(--clr-blue)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.3rem' }}>
-                      💻 Windows
+                       Windows
                     </h4>
                     <p style={{ fontSize: '0.75rem', color: 'var(--txt-secondary)', lineHeight: '1.4', marginTop: '0.25rem' }}>
                       {t.gStep3WinList}
@@ -323,7 +285,7 @@ export default function ConnectionGuide({ t, activeLesson, connectionType, lang,
 
                   <div className="connection-box">
                     <h4 style={{ fontSize: '0.85rem', color: 'var(--clr-cyan)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.3rem' }}>
-                      🍎 macOS
+                       macOS
                     </h4>
                     <p style={{ fontSize: '0.75rem', color: 'var(--txt-secondary)', lineHeight: '1.4', marginTop: '0.25rem' }}>
                       {t.gStep3MacList}
@@ -353,7 +315,7 @@ export default function ConnectionGuide({ t, activeLesson, connectionType, lang,
                     <li>{t.gStep4List3}</li>
                     <li>{t.gStep4List4}</li>
                     <li style={{ marginTop: '0.5rem', listStyleType: 'none', background: 'rgba(19, 209, 141, 0.06)', border: '1px solid rgba(19, 209, 141, 0.3)', borderRadius: '6px', padding: '0.6rem 0.75rem', color: 'var(--clr-green)' }}>
-                      <strong>{lang === 'es' ? '🔌 ¿Qué ocurre al conectarse?' : '🔌 What happens upon connection?'}</strong><br/>
+                      <strong>{lang === 'es' ? ' ¿Qué ocurre al conectarse?' : ' What happens upon connection?'}</strong><br/>
                       {lang === 'es' 
                         ? 'Establecerás un puente de comunicación bidireccional:\n• En el PANEL DE CONTROL verás a los indicadores (gráficos, medidores, radar) reaccionar a las lecturas del Arduino, y podrás pulsar botones o joysticks para mandar órdenes físicas.\n• En la TERMINAL SERIAL podrás escribir comandos manuales directos y ver el texto crudo enviado por tu programa para diagnosticar errores.'
                         : 'You will establish a bi-directional communication bridge:\n• In the CONTROL PANEL, you will see gauges, charts, and radar update dynamically based on sensor data, and you can click buttons or drag joysticks to send physical commands.\n• In the SERIAL TERMINAL, you can send manual text commands and view raw serial logs printed by your sketch to troubleshoot errors.'}
@@ -392,21 +354,21 @@ export default function ConnectionGuide({ t, activeLesson, connectionType, lang,
                       <div style={{ background: '#141c28', border: '1.5px solid var(--clr-cyan)', borderRadius: '8px', padding: '0.5rem 1rem', textAlign: 'center', minWidth: '120px' }}>
                         <span style={{ fontSize: '0.75rem', color: 'var(--clr-cyan)', fontWeight: 'bold', textTransform: 'uppercase' }}>Computadora</span>
                         <div style={{ fontSize: '0.8rem', marginTop: '0.4rem', color: 'var(--txt-secondary)' }}>
-                          🖥️ Puerto USB
+                           Puerto USB
                         </div>
                       </div>
 
                       {/* USB Cable */}
                       <div className="diagram-arrows" style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', color: 'var(--txt-muted)', fontSize: '0.75rem', padding: '0 1rem' }}>
-                        <div style={{ color: 'var(--clr-cyan)', fontWeight: 'bold' }}>🌐 Cable USB</div>
-                        <div className="diagram-arrow">◀──────────▶</div>
+                        <div style={{ color: 'var(--clr-cyan)', fontWeight: 'bold' }}> Cable USB</div>
+                        <div className="diagram-arrow">──────────</div>
                       </div>
 
                       {/* Arduino Card */}
                       <div style={{ background: '#122035', border: '1.5px solid var(--clr-blue)', borderRadius: '8px', padding: '0.5rem 1rem', textAlign: 'center', minWidth: '120px' }}>
                         <span style={{ fontSize: '0.75rem', color: 'var(--clr-blue)', fontWeight: 'bold', textTransform: 'uppercase' }}>Arduino Uno</span>
                         <div style={{ fontSize: '0.8rem', marginTop: '0.4rem', color: 'var(--txt-secondary)' }}>
-                          🔌 Puerto USB
+                           Puerto USB
                         </div>
                       </div>
 
@@ -460,12 +422,12 @@ export default function ConnectionGuide({ t, activeLesson, connectionType, lang,
 
                 <div className="connection-box">
                   <ul style={{ paddingLeft: '1.25rem', fontSize: '0.8rem', color: 'var(--txt-secondary)', display: 'flex', flexDirection: 'column', gap: '0.4rem', lineHeight: '1.5', listStyleType: 'square' }}>
-                    <li>{lang === 'es' ? 'En la parte superior, verifica que el selector de Tipo esté en "🔌 USB (Cable)".' : 'In the top header, verify that the Type selector is set to "🔌 USB (Cable)".'}</li>
+                    <li>{lang === 'es' ? 'En la parte superior, verifica que el selector de Tipo esté en " USB (Cable)".' : 'In the top header, verify that the Type selector is set to " USB (Cable)".'}</li>
                     <li>{lang === 'es' ? 'Asegúrate de que la velocidad esté configurada en "9600" baudios (velocidad estándar usada en las clases).' : 'Make sure the Baud Rate is configured to "9600" bps (standard speed used in classroom sketches).'}</li>
                     <li>{lang === 'es' ? 'Haz clic en el botón rojo "Conectar". En la ventana emergente que mostrará el navegador, selecciona el puerto COM de tu Arduino Uno.' : 'Click the red "Connect" button. In the browser popup window, select the COM port matching your Arduino Uno.'}</li>
                     <li>{lang === 'es' ? 'Haz clic en "Conectar" en la ventana del navegador. El botón cambiará a verde ("Desconectar") y verás la telemetría fluir en tiempo real.' : 'Click "Connect" inside the browser dialog. The button will change to green ("Disconnect") and you will see telemetry start flowing.'}</li>
                     <li style={{ marginTop: '0.5rem', listStyleType: 'none', background: 'rgba(19, 209, 141, 0.06)', border: '1px solid rgba(19, 209, 141, 0.3)', borderRadius: '6px', padding: '0.6rem 0.75rem', color: 'var(--clr-green)' }}>
-                      <strong>{lang === 'es' ? '🔌 ¿Qué ocurre al conectarse?' : '🔌 What happens upon connection?'}</strong><br/>
+                      <strong>{lang === 'es' ? ' ¿Qué ocurre al conectarse?' : ' What happens upon connection?'}</strong><br/>
                       {lang === 'es' 
                         ? 'Establecerás un puente de comunicación bidireccional:\n• En el PANEL DE CONTROL verás a los indicadores (gráficos, medidores, radar) reaccionar a las lecturas del Arduino, y podrás pulsar botones o joysticks para mandar órdenes físicas.\n• En la TERMINAL SERIAL podrás escribir comandos manuales directos y ver el texto crudo enviado por tu programa para diagnosticar errores.'
                         : 'You will establish a bi-directional communication bridge:\n• In the CONTROL PANEL, you will see gauges, charts, and radar update dynamically based on sensor data, and you can click buttons or drag joysticks to send physical commands.\n• In the SERIAL TERMINAL, you can send manual text commands and view raw serial logs printed by your sketch to troubleshoot errors.'}

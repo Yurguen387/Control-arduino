@@ -191,13 +191,9 @@ export default function DashboardBuilder({
   };
 
   const resetToDefault = () => {
-    if (window.confirm(t.msgLayoutReset || "Restaurar diseño por defecto?")) {
-      const assigned = (activeLesson.recommendedWidgets || []).map((w, idx) => ({
-        ...w,
-        slotIndex: idx
-      }));
-      setWidgets(assigned);
-      localStorage.setItem(`edu_layout_${activeLesson.id}`, JSON.stringify(assigned));
+    if (window.confirm(t.msgLayoutReset || "¿Limpiar todo el panel?")) {
+      setWidgets([]);
+      localStorage.setItem(`edu_layout_${activeLesson.id}`, JSON.stringify([]));
     }
   };
 
@@ -292,32 +288,19 @@ export default function DashboardBuilder({
         newWidget.min = Number(widgetMin);
         newWidget.max = Number(widgetMax);
         newWidget.currentVal = Number(widgetMin);
-      } else if (widgetType === 'servo_knob') {
+      } else if (widgetType === 'knob') {
         newWidget.payload = widgetPayload || 'SERVO:';
-        newWidget.currentVal = 90;
+        newWidget.currentVal = 0;
       } else if (widgetType === 'joystick') {
         newWidget.payload = widgetPayload || 'J:';
-        // BUG #1 fix: telemetryKey was only in dead-code block below, moved here
         newWidget.telemetryKey = widgetTelemetryKey || 'joyx';
         newWidget.telemetryKey2 = widgetTelemetryKey2 || 'joyy';
-      } else if (widgetType === 'motor') {
-        newWidget.payload = widgetPayload || 'M:';
-        newWidget.activeMotorDir = 'S';
       } else if (widgetType === 'gauge') {
         newWidget.telemetryKey = widgetTelemetryKey;
         newWidget.min = Number(widgetMin);
         newWidget.max = Number(widgetMax);
-      } else if (widgetType === 'radar') {
-        newWidget.telemetryKey = widgetTelemetryKey || 'd';
-        newWidget.min = 0;
-        newWidget.max = 150;
-      } else if (widgetType === 'dht11') {
-        newWidget.telemetryKey = widgetTelemetryKey || 'temp';
-        newWidget.telemetryKey2 = widgetTelemetryKey2 || 'hum';
-      } else if (widgetType === 'ir') {
-        newWidget.telemetryKey = widgetTelemetryKey || 'ir';
-      } else if (widgetType === 'sound') {
-        newWidget.telemetryKey = widgetTelemetryKey || 'snd';
+      } else if (widgetType === 'indicator') {
+        newWidget.telemetryKey = widgetTelemetryKey || 'ind';
       } else if (widgetType === 'chart') {
         newWidget.telemetryKey = widgetTelemetryKey;
       }
@@ -549,12 +532,22 @@ export default function DashboardBuilder({
       let angle = Math.round((Math.atan2(dy, dx) * 180) / Math.PI);
       let servoAngle = angle + 90;
       if (servoAngle < 0) servoAngle += 360;
-      if (servoAngle > 180) {
-        if (servoAngle < 270) servoAngle = 180;
-        else servoAngle = 0;
+      
+      const min = widget.min !== undefined ? Number(widget.min) : 0;
+      const max = widget.max !== undefined ? Number(widget.max) : 180;
+      
+      let mappedValue = 0;
+      if (servoAngle >= 0 && servoAngle <= 270) {
+        mappedValue = Math.round(min + (servoAngle / 270) * (max - min));
+      } else {
+        if (servoAngle > 270 && servoAngle < 315) {
+          mappedValue = max;
+        } else {
+          mappedValue = min;
+        }
       }
 
-      handleSliderChange(dialId, widget.payload, servoAngle);
+      handleSliderChange(dialId, widget.payload, mappedValue);
     };
 
     const handleDialMouseUp = () => {
@@ -801,7 +794,7 @@ export default function DashboardBuilder({
                 {/* Header widget (Drag Handle) */}
                 <div 
                   className="widget-header" 
-                  style={{ cursor: 'grab', background: 'rgba(0,0,0,0.2)', padding: '0.2rem', borderRadius: '4px' }}
+                  style={{ cursor: 'grab', background: 'rgba(0,0,0,0.2)', padding: '0.2rem', borderRadius: '4px', touchAction: 'none' }}
                   onMouseDown={() => { dragStartFromHeader.current = true; }}
                   onTouchStart={() => { dragStartFromHeader.current = true; }}
                 >
@@ -1125,194 +1118,6 @@ export default function DashboardBuilder({
                     </div>
                   )}
 
-                  {/* SPECIALIZED: ULTRASONIC RADAR */}
-                  {widget.type === 'radar' && (
-                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flexGrow: 1, alignItems: 'flex-start' }}>
-                        <span className="label-tape yellow" style={{ fontSize: '0.55rem' }}>
-                          📡 RADAR SENSOR
-                        </span>
-                        {(() => {
-                          const distance = telemetryData ? telemetryData[widget.telemetryKey] : null;
-                          const hasAlert = distance !== null && distance < 20;
-                          return (
-                            <>
-                              <div className={`lcd-display ${hasAlert ? 'red' : ''}`} style={{ fontSize: '1.2rem', padding: '0.3rem 0.6rem', marginTop: '0.2rem', width: '100%', justifyContent: 'center' }}>
-                                {distance !== null ? `${distance} cm` : '---'}
-                              </div>
-                              <span style={{ fontSize: '0.6rem', color: hasAlert ? 'var(--clr-red)' : 'var(--clr-green)', fontWeight: 'bold', textTransform: 'uppercase', marginTop: '0.1rem' }}>
-                                {distance === null ? 'ESPERANDO...' : hasAlert ? '⚠️ ¡CERCANO!' : '✅ DESPEJADO'}
-                              </span>
-                            </>
-                          );
-                        })()}
-                      </div>
-                      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '75px', height: '75px', position: 'relative' }}>
-                        <div style={{
-                          width: '70px',
-                          height: '70px',
-                          borderRadius: '50%',
-                          background: '#012a1c',
-                          border: '3px solid #0f131a',
-                          overflow: 'hidden',
-                          position: 'relative',
-                          boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.6)'
-                        }}>
-                          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '50px', height: '50px', border: '1px dashed rgba(16, 185, 129, 0.3)', borderRadius: '50%' }} />
-                          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '25px', height: '25px', border: '1px dashed rgba(16, 185, 129, 0.3)', borderRadius: '50%' }} />
-                          <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: '1px', background: 'rgba(16, 185, 129, 0.2)' }} />
-                          <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: '1px', background: 'rgba(16, 185, 129, 0.2)' }} />
-                          <div style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: '50%',
-                            width: '50%',
-                            height: '100%',
-                            background: 'linear-gradient(90deg, rgba(16, 185, 129, 0.4) 0%, transparent 100%)',
-                            transformOrigin: '0% 50%',
-                            animation: 'spin-clock 2.5s linear infinite',
-                            pointerEvents: 'none'
-                          }} />
-                          {(() => {
-                            const distance = telemetryData ? telemetryData[widget.telemetryKey] : null;
-                            if (distance === null || distance === undefined) return null;
-                            const pct = Math.min(100, Math.max(10, (distance / 150) * 100));
-                            return (
-                              <div style={{
-                                position: 'absolute',
-                                bottom: `${pct * 0.35 + 15}%`,
-                                left: '50%',
-                                width: '6px',
-                                height: '6px',
-                                background: distance < 20 ? '#ef4444' : '#10b981',
-                                borderRadius: '50%',
-                                transform: 'translateX(-50%)',
-                                boxShadow: `0 0 6px ${distance < 20 ? '#ef4444' : '#10b981'}`,
-                                animation: 'pulse-glow 1s infinite'
-                              }} />
-                            );
-                          })()}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* SPECIALIZED: DHT11 CLIMATE */}
-                  {widget.type === 'dht11' && (
-                    <div style={{ display: 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flexGrow: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                          <span className="label-tape red" style={{ fontSize: '0.5rem', padding: '0.1rem 0.3rem' }}>🌡️ TEMP</span>
-                          <div className="lcd-display" style={{ minWidth: '60px', background: '#451a03', color: '#f97316', textShadow: '0 0 4px #f97316' }}>
-                            {telemetryData && telemetryData[widget.telemetryKey] !== undefined ? `${telemetryData[widget.telemetryKey]}°C` : '--°C'}
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                          <span className="label-tape" style={{ fontSize: '0.5rem', padding: '0.1rem 0.3rem', background: '#1d4ed8' }}>💧 HUM</span>
-                          <div className="lcd-display blue" style={{ minWidth: '60px' }}>
-                            {telemetryData && telemetryData[widget.telemetryKey2] !== undefined ? `${telemetryData[widget.telemetryKey2]}%` : '--%'}
-                          </div>
-                        </div>
-                      </div>
-                      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '50px', height: '60px' }}>
-                        <svg width="45" height="55" viewBox="0 0 50 60" style={{ overflow: 'visible' }}>
-                          <line x1="15" y1="46" x2="15" y2="58" stroke="#cbd5e1" strokeWidth="2.5" />
-                          <line x1="25" y1="46" x2="25" y2="58" stroke="#cbd5e1" strokeWidth="2.5" />
-                          <line x1="35" y1="46" x2="35" y2="58" stroke="#cbd5e1" strokeWidth="2.5" />
-                          <rect x="8" y="32" width="34" height="15" rx="2" fill="#1e293b" stroke="#0f131a" strokeWidth="1.5" />
-                          <circle cx="34" cy="39" r="1.5" fill="#ef4444" />
-                          <rect x="10" y="4" width="30" height="36" rx="3.5" fill="#3b82f6" stroke="#1d4ed8" strokeWidth="2" />
-                          <rect x="14" y="8" width="5" height="5" rx="1" fill="#0f172a" />
-                          <rect x="22" y="8" width="5" height="5" rx="1" fill="#0f172a" />
-                          <rect x="30" y="8" width="5" height="5" rx="1" fill="#0f172a" />
-                          <rect x="14" y="16" width="5" height="5" rx="1" fill="#0f172a" />
-                          <rect x="22" y="16" width="5" height="5" rx="1" fill="#0f172a" />
-                          <rect x="30" y="16" width="5" height="5" rx="1" fill="#0f172a" />
-                          <rect x="14" y="24" width="5" height="5" rx="1" fill="#0f172a" />
-                          <rect x="22" y="24" width="5" height="5" rx="1" fill="#0f172a" />
-                          <rect x="30" y="24" width="5" height="5" rx="1" fill="#0f172a" />
-                        </svg>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* SPECIALIZED: MOTOR DRIVER */}
-                  {widget.type === 'motor' && (
-                    <div style={{ display: 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flexGrow: 1 }}>
-                        <div style={{ display: 'flex', gap: '0.2rem', justifyContent: 'center' }}>
-                          <button 
-                            onClick={() => handleMotorClick(widget.id, widget.payload, 'F')}
-                            disabled={!isConnected}
-                            className={`btn arcade-btn-push ${widget.activeMotorDir === 'F' ? 'btn-success' : 'btn-secondary'}`}
-                            style={{ padding: 0, width: '26px', height: '26px', fontSize: '0.7rem', border: '2px solid #0f131a', borderRadius: '50%' }}
-                          >
-                            ▲
-                          </button>
-                        </div>
-                        <div style={{ display: 'flex', gap: '0.2rem', justifyContent: 'center' }}>
-                          <button 
-                            onClick={() => handleMotorClick(widget.id, widget.payload, 'L')}
-                            disabled={!isConnected}
-                            className={`btn arcade-btn-push ${widget.activeMotorDir === 'L' ? 'btn-success' : 'btn-secondary'}`}
-                            style={{ padding: 0, width: '26px', height: '26px', fontSize: '0.7rem', border: '2px solid #0f131a', borderRadius: '50%' }}
-                          >
-                            ◀
-                          </button>
-                          <button 
-                            onClick={() => handleMotorClick(widget.id, widget.payload, 'S')}
-                            disabled={!isConnected}
-                            className={`btn arcade-btn-push ${widget.activeMotorDir === 'S' || !widget.activeMotorDir ? 'btn-danger' : 'btn-secondary'}`}
-                            style={{ padding: 0, width: '26px', height: '26px', fontSize: '0.7rem', border: '2px solid #0f131a', borderRadius: '50%', background: 'var(--clr-red)' }}
-                          >
-                            ■
-                          </button>
-                          <button 
-                            onClick={() => handleMotorClick(widget.id, widget.payload, 'R')}
-                            disabled={!isConnected}
-                            className={`btn arcade-btn-push ${widget.activeMotorDir === 'R' ? 'btn-success' : 'btn-secondary'}`}
-                            style={{ padding: 0, width: '26px', height: '26px', fontSize: '0.7rem', border: '2px solid #0f131a', borderRadius: '50%' }}
-                          >
-                            ▶
-                          </button>
-                        </div>
-                        <div style={{ display: 'flex', gap: '0.2rem', justifyContent: 'center' }}>
-                          <button 
-                            onClick={() => handleMotorClick(widget.id, widget.payload, 'B')}
-                            disabled={!isConnected}
-                            className={`btn arcade-btn-push ${widget.activeMotorDir === 'B' ? 'btn-success' : 'btn-secondary'}`}
-                            style={{ padding: 0, width: '26px', height: '26px', fontSize: '0.7rem', border: '2px solid #0f131a', borderRadius: '50%' }}
-                          >
-                            ▼
-                          </button>
-                        </div>
-                      </div>
-                      
-                      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '75px', height: '75px' }}>
-                        {(() => {
-                          const isSpinning = widget.activeMotorDir && widget.activeMotorDir !== 'S';
-                          const spinDir = widget.activeMotorDir || 'R';
-                          return (
-                            <svg width="75" height="75" viewBox="0 0 85 70" style={{ overflow: 'visible' }}>
-                              <rect x="5" y="20" width="38" height="28" rx="4" fill="#f59e0b" stroke="#0f131a" strokeWidth="2" />
-                              <rect x="43" y="24" width="10" height="20" rx="2" fill="#cbd5e1" stroke="#0f131a" strokeWidth="1.5" />
-                              <g style={{
-                                transformOrigin: '23px 34px',
-                                animation: isSpinning ? `${spinDir === 'R' || spinDir === 'F' ? 'spin-clock' : 'spin-counter'} 0.5s linear infinite` : 'none'
-                              }}>
-                                <circle cx="23" cy="34" r="6" fill="#e2e8f0" stroke="#cbd5e1" strokeWidth="1" />
-                                <circle cx="23" cy="34" r="23" fill="none" stroke="#0f131a" strokeWidth="6" />
-                                <circle cx="23" cy="34" r="20" fill="none" stroke="#4b5563" strokeWidth="2.5" />
-                                <circle cx="23" cy="34" r="16" fill="#fbbf24" stroke="#d97706" strokeWidth="2" />
-                                <line x1="23" y1="18" x2="23" y2="50" stroke="#d97706" strokeWidth="2.5" />
-                                <line x1="7" y1="34" x2="39" y2="34" stroke="#d97706" strokeWidth="2.5" />
-                              </g>
-                            </svg>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  )}
 
                   {/* SPECIALIZED: JOYSTICK */}
                   {widget.type === 'joystick' && (
@@ -1407,214 +1212,111 @@ export default function DashboardBuilder({
                     </div>
                   )}
 
-                  {/* SPECIALIZED: IR DETECTOR */}
-                  {widget.type === 'ir' && (
+                  {/* DIGITAL INDICATOR */}
+                  {widget.type === 'indicator' && (
                     <div style={{ display: 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flexGrow: 1 }}>
                         {(() => {
-                          const obstacleVal = telemetryData ? telemetryData[widget.telemetryKey] : 0;
-                          const active = obstacleVal === 1;
+                          const val = telemetryData ? telemetryData[widget.telemetryKey] : 0;
+                          const active = val === 1 || val === "1" || val === true || val === "true" || val > 0;
                           return (
                             <>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                                 <div style={{
-                                  width: '12px',
-                                  height: '12px',
+                                  width: '14px',
+                                  height: '14px',
                                   borderRadius: '50%',
-                                  background: active ? 'var(--clr-red)' : '#1e293b',
+                                  background: active ? widget.color || 'var(--clr-green)' : 'rgba(255,255,255,0.05)',
                                   border: '2px solid #0f131a',
-                                  boxShadow: active ? '0 0 8px var(--clr-red)' : 'none',
+                                  boxShadow: active ? `0 0 10px ${widget.color || 'var(--clr-green)'}` : 'none',
                                   transition: 'all 0.2s'
                                 }} />
-                                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: active ? 'var(--clr-red)' : 'var(--txt-muted)' }}>
-                                  {widget.telemetryKey === 'ir'
-                                    ? (active ? '¡OBSTÁCULO!' : 'LIBRE')
-                                    : (active ? 'ACTIVO (1)' : 'INACTIVO (0)')
-                                  }
+                                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: active ? (widget.color || 'var(--clr-green)') : 'var(--txt-muted)' }}>
+                                  {active ? 'ACTIVO (1)' : 'INACTIVO (0)'}
                                 </span>
                               </div>
-                              <span style={{ fontSize: '0.65rem', color: 'var(--txt-muted)', alignSelf: 'center' }}>Clave: {widget.telemetryKey}</span>
+                              <span style={{ fontSize: '0.65rem', color: 'var(--txt-muted)' }}>Clave: {widget.telemetryKey}</span>
                             </>
                           );
                         })()}
                       </div>
-                      
-                      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '55px', height: '60px' }}>
-                        {(() => {
-                          const obstacleVal = telemetryData ? telemetryData[widget.telemetryKey] : 0;
-                          const active = obstacleVal === 1;
-                          return (
-                            <svg width="55" height="60" viewBox="0 0 50 60" style={{ overflow: 'visible' }}>
-                              {active && (
-                                <g opacity="0.85">
-                                  <path d="M 17,2 Q 25,-12 33,2" fill="none" stroke="var(--clr-red)" strokeWidth="1.5" strokeDasharray="2,2" className="animate-pulse" />
-                                  <path d="M 12,-2 Q 25,-20 38,-2" fill="none" stroke="var(--clr-red)" strokeWidth="1.2" opacity="0.7" />
-                                </g>
-                              )}
-                              <rect x="13" y="14" width="24" height="42" rx="2.5" fill="#0f172a" stroke="#1e293b" strokeWidth="1.5" />
-                              <rect x="20" y="26" width="10" height="10" fill="#2563eb" rx="0.5" />
-                              <circle cx="25" cy="31" r="2" fill="#ffe870" />
-                              <rect x="16" y="42" width="6" height="10" fill="#1e293b" />
-                              <line x1="21" y1="56" x2="21" y2="60" stroke="#cbd5e1" strokeWidth="1.5" />
-                              <line x1="25" y1="56" x2="25" y2="60" stroke="#cbd5e1" strokeWidth="1.5" />
-                              <line x1="29" y1="56" x2="29" y2="60" stroke="#cbd5e1" strokeWidth="1.5" />
-                              <rect x="15" y="6" width="6" height="8" rx="1.5" fill="#60a5fa" stroke="#93c5fd" strokeWidth="0.5" />
-                              <line x1="17" y1="14" x2="17" y2="10" stroke="#94a3b8" strokeWidth="1" />
-                              <line x1="19" y1="14" x2="19" y2="10" stroke="#94a3b8" strokeWidth="1" />
-                              <rect x="29" y="6" width="6" height="8" rx="1.5" fill="#1e293b" stroke="#111827" strokeWidth="0.5" />
-                              <line x1="31" y1="14" x2="31" y2="10" stroke="#94a3b8" strokeWidth="1" />
-                              <line x1="33" y1="14" x2="33" y2="10" stroke="#94a3b8" strokeWidth="1" />
-                              <circle cx="18" cy="20" r="1.5" fill="#10b981" />
-                              <circle cx="32" cy="20" r="1.5" fill={active ? "#ef4444" : "#4b5563"} />
-                            </svg>
-                          );
-                        })()}
-                      </div>
                     </div>
                   )}
 
-                  {/* SPECIALIZED: SOUND VU LOUDNESS */}
-                  {widget.type === 'sound' && (
-                    <div style={{ display: 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
-                      {(() => {
-                        const volume = telemetryData && telemetryData[widget.telemetryKey] !== undefined 
-                          ? telemetryData[widget.telemetryKey] 
-                          : 0;
-                        const activeSegments = Math.round((volume / 100) * 8);
-                        return (
-                          <>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', flexGrow: 1 }}>
-                              <div style={{ display: 'flex', gap: '3px', width: '100%', height: '14px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-subtle)', borderRadius: '4px', padding: '2px' }}>
-                                {[...Array(8)].map((_, i) => {
-                                  const isActive = i < activeSegments;
-                                  let color = 'rgba(255,255,255,0.05)';
-                                  if (isActive) {
-                                    if (i < 4) color = 'var(--clr-green)';
-                                    else if (i < 6) color = 'var(--clr-yellow)';
-                                    else color = 'var(--clr-red)';
-                                  }
-                                  return (
-                                    <div 
-                                      key={i} 
-                                      style={{ 
-                                        flexGrow: 1, 
-                                        background: color, 
-                                        borderRadius: '1.5px',
-                                        boxShadow: isActive ? `0 0 4px ${color}` : 'none',
-                                        transition: 'background 0.1s ease'
-                                      }} 
-                                    />
-                                  );
-                                })}
-                              </div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: 'var(--txt-muted)' }}>
-                                <span>Micrófono ({widget.telemetryKey})</span>
-                                <b style={{ color: accentColor }}>{volume} %</b>
-                              </div>
-                            </div>
-                            
-                            <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '55px', height: '60px' }}>
-                              <svg width="55" height="60" viewBox="0 0 50 60" style={{ overflow: 'visible' }}>
-                                {volume > 15 && (
-                                  <g>
-                                    <path d="M 16,0 A 10,10 0 0,1 34,0" fill="none" stroke="var(--clr-red)" strokeWidth="1.5" className="animate-pulse" />
-                                    {volume > 40 && (
-                                      <path d="M 11,-4 A 15,15 0 0,1 39,-4" fill="none" stroke="var(--clr-red)" strokeWidth="1.2" opacity="0.8" className="animate-pulse" />
-                                    )}
-                                  </g>
-                                )}
-                                <rect x="13" y="14" width="24" height="42" rx="2.5" fill="#991b1b" stroke="#7f1d1d" strokeWidth="1.5" />
-                                <line x1="18" y1="56" x2="18" y2="60" stroke="#cbd5e1" strokeWidth="1.5" />
-                                <line x1="22" y1="56" x2="22" y2="60" stroke="#cbd5e1" strokeWidth="1.5" />
-                                <line x1="26" y1="56" x2="26" y2="60" stroke="#cbd5e1" strokeWidth="1.5" />
-                                <line x1="30" y1="56" x2="30" y2="60" stroke="#cbd5e1" strokeWidth="1.5" />
-                                <rect x="20" y="26" width="10" height="10" fill="#2563eb" rx="0.5" />
-                                <circle cx="25" cy="31" r="2" fill="#ffe870" />
-                                <rect x="15" y="4" width="20" height="10" rx="1" fill="#94a3b8" stroke="#64748b" strokeWidth="1" />
-                                <ellipse cx="25" cy="4" rx="10" ry="2" fill="#1e293b" />
-                                <line x1="20" y1="14" x2="20" y2="11" stroke="#cbd5e1" strokeWidth="1" />
-                                <line x1="30" y1="14" x2="30" y2="11" stroke="#cbd5e1" strokeWidth="1" />
-                                <rect x="16" y="42" width="6" height="8" fill="#1e293b" />
-                                <circle cx="18" cy="20" r="1.5" fill="#10b981" />
-                                <circle cx="32" cy="20" r="1.5" fill={volume > 30 ? "#ef4444" : "#4b5563"} />
-                              </svg>
-                            </div>
-                          </>
-                        );
-                      })()}
-                    </div>
-                  )}
 
-                  {/* SPECIALIZED: SERVO RADIAL KNOB */}
-                  {widget.type === 'servo_knob' && (
-                    <div style={{ display: 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flexGrow: 1 }}>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--txt-muted)' }}>Servo SG90</span>
-                        <b style={{ color: accentColor, fontSize: '1.2rem', textShadow: `0 0 6px ${accentColor}` }}>
-                          {widget.currentVal !== undefined ? `${widget.currentVal}°` : '90°'}
-                        </b>
-                        <div className="label-tape" style={{ fontSize: '0.55rem', display: 'inline-block', maxWidth: 'max-content', marginTop: '0.2rem' }}>
-                          🚀 {widget.payload}{widget.currentVal !== undefined ? widget.currentVal : 90}
+
+
+                  {/* KNOB (POTENTIOMETER) */}
+                  {widget.type === 'knob' && (() => {
+                    const min = widget.min !== undefined ? Number(widget.min) : 0;
+                    const max = widget.max !== undefined ? Number(widget.max) : 180;
+                    const current = widget.currentVal !== undefined ? widget.currentVal : min;
+                    const ratio = (current - min) / (max - min || 1);
+                    const rotation = -135 + (ratio * 270);
+                    
+                    return (
+                      <div style={{ display: 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flexGrow: 1 }}>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--txt-muted)' }}>Potenciómetro</span>
+                          <b style={{ color: accentColor, fontSize: '1.2rem', textShadow: `0 0 6px ${accentColor}` }}>
+                            {current}
+                          </b>
+                          <div className="label-tape" style={{ fontSize: '0.55rem', display: 'inline-block', maxWidth: 'max-content', marginTop: '0.2rem' }}>
+                            {widget.payload}{current}
+                          </div>
                         </div>
-                      </div>
-                      
-                      <div 
-                        id={`dial-${widget.id}`}
-                        onMouseDown={(e) => handleDialMouseDown(e, widget)}
-                        onTouchStart={(e) => handleDialMouseDown(e, widget)}
-                        style={{
-                          width: '85px',
-                          height: '85px',
-                          position: 'relative',
-                          cursor: isConnected ? 'pointer' : 'not-allowed',
-                          touchAction: 'none',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0
-                        }}
-                      >
-                        <svg width="85" height="85" viewBox="0 0 85 85" style={{ overflow: 'visible', position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}>
-                          <path d="M 42.5,70 Q 30,85 20,80" fill="none" stroke="#78350f" strokeWidth="1.5" />
-                          <path d="M 42.5,70 Q 35,88 28,83" fill="none" stroke="#dc2626" strokeWidth="1.5" />
-                          <path d="M 42.5,70 Q 40,90 35,85" fill="none" stroke="#f97316" strokeWidth="1.5" />
-                          <rect x="35" y="10" width="15" height="65" rx="2.5" fill="#1d4ed8" stroke="#1e40af" strokeWidth="1" />
-                          <circle cx="42.5" cy="15" r="2.5" fill="#0f172a" />
-                          <circle cx="42.5" cy="70" r="2.5" fill="#0f172a" />
-                          <rect x="25" y="22" width="35" height="40" rx="3.5" fill="#2563eb" stroke="#1d4ed8" strokeWidth="1.5" />
-                          <rect x="29" y="36" width="27" height="15" rx="1" fill="#fff" opacity="0.9" />
-                          <text x="42.5" y="45" fill="#1e3a8a" fontSize="5" fontWeight="bold" textAnchor="middle">SG90</text>
-                          <rect x="29" y="47" width="27" height="2" fill="#dc2626" />
-                          <circle cx="42.5" cy="33" r="10" fill="#1d4ed8" />
-                          <circle cx="42.5" cy="33" r="6" fill="#ffe870" />
-                        </svg>
-
+                        
                         <div 
+                          id={`dial-${widget.id}`}
+                          onMouseDown={(e) => handleDialMouseDown(e, widget)}
+                          onTouchStart={(e) => handleDialMouseDown(e, widget)}
                           style={{
-                            width: '50px',
-                            height: '14px',
-                            position: 'absolute',
-                            top: '26px', 
-                            left: '42.5px',
-                            transformOrigin: '7px 7px',
-                            transform: `translate(-7px, -7px) rotate(${
-                              (widget.currentVal !== undefined ? widget.currentVal : 90)
-                            }deg)`,
-                            transition: 'transform 0.1s ease',
-                            pointerEvents: 'none'
+                            width: '85px',
+                            height: '85px',
+                            position: 'relative',
+                            cursor: isConnected ? 'pointer' : 'not-allowed',
+                            touchAction: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
                           }}
                         >
-                          <svg width="50" height="14" viewBox="0 0 50 14" style={{ overflow: 'visible' }}>
-                            <path d="M7,2 L42,4 A3,3 0 0 1 42,10 L7,12 A7,7 0 0 1 7,2 Z" fill="#f8fafc" stroke="#cbd5e1" strokeWidth="1.2" />
-                            <circle cx="7" cy="7" r="3.5" fill="#cbd5e1" />
-                            <circle cx="18" cy="7" r="1.5" fill="#64748b" />
-                            <circle cx="28" cy="7" r="1.5" fill="#64748b" />
-                            <circle cx="38" cy="7" r="1.5" fill="#64748b" />
+                          <svg width="85" height="85" viewBox="0 0 85 85" style={{ overflow: 'visible', position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}>
+                            <circle cx="42.5" cy="42.5" r="40" fill="#0f172a" stroke="#1e293b" strokeWidth="4" />
+                            <path d="M 14,71 A 40 40 0 1 1 71,71" fill="none" stroke="#334155" strokeWidth="4" strokeLinecap="round" />
                           </svg>
+
+                          <div 
+                            style={{
+                              width: '4px',
+                              height: '40px',
+                              position: 'absolute',
+                              top: '2.5px', 
+                              left: '40.5px',
+                              transformOrigin: '2px 40px',
+                              transform: `rotate(${rotation}deg)`,
+                              transition: 'transform 0.1s ease',
+                              pointerEvents: 'none'
+                            }}
+                          >
+                            <div style={{ width: '4px', height: '12px', background: 'var(--clr-cyan)', borderRadius: '2px', boxShadow: '0 0 8px var(--clr-cyan)' }} />
+                          </div>
+                          
+                          <div style={{
+                            position: 'absolute',
+                            width: '56px',
+                            height: '56px',
+                            borderRadius: '50%',
+                            background: 'radial-gradient(circle at 35% 35%, #475569 0%, #1e293b 70%, #0f172a 100%)',
+                            border: '2px solid #0f131a',
+                            boxShadow: '0 4px 6px rgba(0,0,0,0.5)',
+                            pointerEvents: 'none'
+                          }} />
                         </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                 </div>
               </div>
@@ -1675,7 +1377,7 @@ export default function DashboardBuilder({
                     } else if (type === 'slider') {
                       setWidgetIcon('sliders');
                       setWidgetColor('var(--clr-yellow)');
-                    } else if (type === 'servo_knob') {
+                    } else if (type === 'knob') {
                       setWidgetIcon('sliders');
                       setWidgetColor('var(--clr-purple)');
                     } else if (type === 'joystick') {
@@ -1690,27 +1392,10 @@ export default function DashboardBuilder({
                     } else if (type === 'chart') {
                       setWidgetIcon('activity');
                       setWidgetColor('var(--clr-purple)');
-                    } else if (type === 'motor') {
-                      setWidgetIcon('sliders');
-                      setWidgetColor('var(--clr-yellow)');
-                      setWidgetPayload('M:');
-                    } else if (type === 'radar') {
-                      setWidgetIcon('activity');
-                      setWidgetColor('var(--clr-cyan)');
-                      setWidgetTelemetryKey('d');
-                    } else if (type === 'dht11') {
-                      setWidgetIcon('thermometer');
-                      setWidgetColor('var(--clr-blue)');
-                      setWidgetTelemetryKey('temp');
-                      setWidgetTelemetryKey2('hum');
-                    } else if (type === 'ir') {
-                      setWidgetIcon('navigation');
+                    } else if (type === 'indicator') {
+                      setWidgetIcon('lightbulb');
                       setWidgetColor('var(--clr-red)');
-                      setWidgetTelemetryKey('ir');
-                    } else if (type === 'sound') {
-                      setWidgetIcon('volume2');
-                      setWidgetColor('var(--clr-yellow)');
-                      setWidgetTelemetryKey('snd');
+                      setWidgetTelemetryKey('ind');
                     }
                   }}
                   className="form-input"
@@ -1718,10 +1403,11 @@ export default function DashboardBuilder({
                   <option value="button">{t.typeButton}</option>
                   <option value="toggle">{t.typeToggle}</option>
                   <option value="slider">{t.typeSlider}</option>
+                  <option value="knob">Potenciómetro</option>
                   <option value="joystick">{t.typeJoystick}</option>
                   <option value="gauge">{t.typeGauge}</option>
                   <option value="chart">{t.typeChart}</option>
-                  <option value="ir">{t.typeIRIndicator}</option>
+                  <option value="indicator">Luz Indicadora (Dato digital)</option>
                 </select>
               </div>
 
@@ -1741,27 +1427,51 @@ export default function DashboardBuilder({
               </div>
 
               {/* Action specific inputs */}
-              {(widgetType === 'button' || widgetType === 'toggle' || widgetType === 'slider' || widgetType === 'servo_knob' || widgetType === 'joystick' || widgetType === 'motor') && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                  <label style={{ fontSize: '0.8rem', color: 'var(--txt-secondary)' }}>
-                    {widgetType === 'slider' || widgetType === 'servo_knob' || widgetType === 'joystick' || widgetType === 'motor'
-                      ? 'Prefijo de comando (ej: SERVO:, J:, M:)'
-                      : t.widgetPayload}
-                  </label>
-                  <input
-                    type="text"
-                    value={widgetPayload}
-                    onChange={(e) => setWidgetPayload(e.target.value)}
-                    placeholder={t.widgetPayloadPlaceholder}
-                    className="form-input"
-                  />
-                  <span style={{ fontSize: '0.7rem', color: 'var(--txt-muted)', marginTop: '0.15rem', lineHeight: '1.3' }}>
-                    {widgetType === 'slider' || widgetType === 'servo_knob' || widgetType === 'joystick' || widgetType === 'motor'
-                      ? t.helpPayloadPrefix
-                      : t.helpPayload}
-                  </span>
-                </div>
-              )}
+              {(widgetType === 'button' || widgetType === 'toggle' || widgetType === 'slider' || widgetType === 'knob') && (() => {
+                const predefinedPayloads = ["SERVO:", "MOTA:", "MOTB:", "LED:", "BEEP:", "1", "0"];
+                const isCustomPayload = !predefinedPayloads.includes(widgetPayload);
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <label style={{ fontSize: '0.8rem', color: 'var(--txt-secondary)' }}>
+                      Destino / Acción (Prefijo)
+                    </label>
+                    <select
+                      value={isCustomPayload ? "custom" : widgetPayload}
+                      onChange={(e) => {
+                        if (e.target.value === "custom") {
+                          setWidgetPayload("");
+                        } else {
+                          setWidgetPayload(e.target.value);
+                        }
+                      }}
+                      className="form-input"
+                      style={{ appearance: 'none', backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2394a3b8%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right .7rem top 50%', backgroundSize: '.65rem auto' }}
+                    >
+                      <option value="SERVO:">Servomotor (SERVO:)</option>
+                      <option value="MOTA:">Motor A (MOTA:)</option>
+                      <option value="MOTB:">Motor B (MOTB:)</option>
+                      <option value="LED:">LED / Foco (LED:)</option>
+                      <option value="BEEP:">Zumbador (BEEP:)</option>
+                      <option value="1">Señal Digital 1 (1)</option>
+                      <option value="0">Señal Digital 0 (0)</option>
+                      <option value="custom">-- Escribir Personalizado --</option>
+                    </select>
+                    {isCustomPayload && (
+                      <input
+                        type="text"
+                        value={widgetPayload}
+                        onChange={(e) => setWidgetPayload(e.target.value)}
+                        placeholder={t.widgetPayloadPlaceholder}
+                        className="form-input"
+                        style={{ marginTop: '0.25rem' }}
+                      />
+                    )}
+                    <span style={{ fontSize: '0.7rem', color: 'var(--txt-muted)', marginTop: '0.15rem', lineHeight: '1.3' }}>
+                      Selecciona qué componente en el Arduino recibirá este valor.
+                    </span>
+                  </div>
+                );
+              })()}
 
               {/* Toggle off payload */}
               {widgetType === 'toggle' && (
@@ -1781,7 +1491,7 @@ export default function DashboardBuilder({
               )}
 
               {/* Ranges */}
-              {(widgetType === 'slider' || widgetType === 'gauge' || widgetType === 'radar') && (
+              {(widgetType === 'slider' || widgetType === 'gauge') && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                     <label style={{ fontSize: '0.8rem', color: 'var(--txt-secondary)' }}>{t.widgetMin}</label>
@@ -1808,39 +1518,54 @@ export default function DashboardBuilder({
               )}
 
               {/* Telemetry keys */}
-              {(widgetType === 'gauge' || widgetType === 'chart' || widgetType === 'radar' || widgetType === 'dht11' || widgetType === 'ir' || widgetType === 'sound') && (
-                <div style={{ display: 'grid', gridTemplateColumns: widgetType === 'dht11' ? '1fr 1fr' : '1fr', gap: '0.5rem' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                    <label style={{ fontSize: '0.8rem', color: 'var(--txt-secondary)' }}>
-                      {widgetType === 'dht11' ? 'Clave Temperatura' : t.widgetTelemetryKey}
-                    </label>
-                    <input
-                      type="text"
-                      value={widgetTelemetryKey}
-                      onChange={(e) => setWidgetTelemetryKey(e.target.value.trim().toLowerCase())}
-                      placeholder="Ej: pot, temp, d"
-                      className="form-input"
-                    />
-                  </div>
-                  
-                  {widgetType === 'dht11' && (
+              {(widgetType === 'gauge' || widgetType === 'chart' || widgetType === 'indicator') && (() => {
+                const predefinedKeys = ["temp", "hum", "d", "pot", "ldr", "snd", "ind"];
+                const isCustomKey = !predefinedKeys.includes(widgetTelemetryKey);
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.5rem' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                      <label style={{ fontSize: '0.8rem', color: 'var(--txt-secondary)' }}>Clave Humedad</label>
-                      <input
-                        type="text"
-                        value={widgetTelemetryKey2}
-                        onChange={(e) => setWidgetTelemetryKey2(e.target.value.trim().toLowerCase())}
-                        placeholder="Ej: hum"
+                      <label style={{ fontSize: '0.8rem', color: 'var(--txt-secondary)' }}>
+                        Origen del Dato (Clave)
+                      </label>
+                      <select
+                        value={isCustomKey ? "custom" : widgetTelemetryKey}
+                        onChange={(e) => {
+                          if (e.target.value === "custom") {
+                            setWidgetTelemetryKey("");
+                          } else {
+                            setWidgetTelemetryKey(e.target.value);
+                          }
+                        }}
                         className="form-input"
-                      />
+                        style={{ appearance: 'none', backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2394a3b8%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right .7rem top 50%', backgroundSize: '.65rem auto' }}
+                      >
+                        <option value="d">Distancia Ultrasónica (d)</option>
+                        <option value="temp">Temperatura (temp)</option>
+                        <option value="hum">Humedad (hum)</option>
+                        <option value="pot">Potenciómetro (pot)</option>
+                        <option value="ldr">Luz / Fotorresistencia (ldr)</option>
+                        <option value="snd">Nivel de Sonido (snd)</option>
+                        <option value="ind">Sensor Digital (ind)</option>
+                        <option value="custom">-- Escribir Personalizado --</option>
+                      </select>
+                      {isCustomKey && (
+                        <input
+                          type="text"
+                          value={widgetTelemetryKey}
+                          onChange={(e) => setWidgetTelemetryKey(e.target.value.trim().toLowerCase())}
+                          placeholder="Ej: temp, pot, vel"
+                          className="form-input"
+                          style={{ marginTop: '0.25rem' }}
+                        />
+                      )}
                     </div>
-                  )}
-
-                  <div style={{ gridColumn: widgetType === 'dht11' ? 'span 2' : 'span 1', fontSize: '0.7rem', color: 'var(--txt-muted)', marginTop: '0.15rem', lineHeight: '1.3' }}>
-                    {t.helpTelemetryKey}
+                    
+                    <div style={{ gridColumn: 'span 1', fontSize: '0.7rem', color: 'var(--txt-muted)', marginTop: '0.15rem', lineHeight: '1.3' }}>
+                      Selecciona la clave con la que el Arduino está enviando este dato.
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Submit Buttons */}
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.75rem', borderTop: '1px solid var(--border-subtle)', paddingTop: '0.5rem' }}>
