@@ -129,6 +129,60 @@ export default function DashboardBuilder({
     });
   }, [telemetryData]);
 
+  // Gamepad / Keyboard control effect for Joystick
+  useEffect(() => {
+    if (!isConnected) return;
+    
+    const joystick = widgets.find(w => w.type === 'joystick');
+    if (!joystick) return;
+
+    const prefix = joystick.payload || 'J:';
+    let x = 0;
+    let y = 0;
+    let activeKeys = new Set();
+
+    const handleKeyDown = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      
+      const key = e.key.toLowerCase();
+      if (['w', 'a', 's', 'd', ' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+        if (!activeKeys.has(key)) {
+          activeKeys.add(key);
+          updateMovement();
+        }
+        if (key === ' ' || key.startsWith('arrow')) e.preventDefault();
+      }
+    };
+
+    const handleKeyUp = (e) => {
+      const key = e.key.toLowerCase();
+      if (activeKeys.has(key)) {
+        activeKeys.delete(key);
+        updateMovement();
+      }
+    };
+
+    const updateMovement = () => {
+      x = 0;
+      y = 0;
+      if (activeKeys.has('w') || activeKeys.has('arrowup')) y = 100;
+      if (activeKeys.has('s') || activeKeys.has('arrowdown')) y = -100;
+      if (activeKeys.has('d') || activeKeys.has('arrowright')) x = 100;
+      if (activeKeys.has('a') || activeKeys.has('arrowleft')) x = -100;
+      if (activeKeys.has(' ')) { x = 0; y = 0; } // STOP
+
+      sendData(`${prefix}${x},${y}`);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [isConnected, widgets, sendData]);
+
   // Export widgets layout to JSON file
   const exportLayout = () => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(widgets, null, 2));
@@ -225,7 +279,7 @@ export default function DashboardBuilder({
             baseWidget.payload = widgetPayload;
             baseWidget.min = Number(widgetMin);
             baseWidget.max = Number(widgetMax);
-          } else if (widgetType === 'servo_knob') {
+          } else if (widgetType === 'knob') {
             baseWidget.payload = widgetPayload || 'SERVO:';
           } else if (widgetType === 'joystick') {
             baseWidget.payload = widgetPayload || 'J:';
@@ -499,7 +553,7 @@ export default function DashboardBuilder({
       const { scaleX: fX, scaleY: fY } = throttleTimers.current.latestValues[id];
       await sendData(`${prefix}${fX},${fY}`);
       delete throttleTimers.current[id];
-    }, 200);
+    }, 60);
   };
 
   // Radial Dial handler for Servo
@@ -533,14 +587,17 @@ export default function DashboardBuilder({
       let servoAngle = angle + 90;
       if (servoAngle < 0) servoAngle += 360;
       
+      // Shift so that 0 is at -135deg (min) and 270 is at +135deg (max)
+      let normalized = (servoAngle + 135) % 360;
+      
       const min = widget.min !== undefined ? Number(widget.min) : 0;
       const max = widget.max !== undefined ? Number(widget.max) : 180;
       
       let mappedValue = 0;
-      if (servoAngle >= 0 && servoAngle <= 270) {
-        mappedValue = Math.round(min + (servoAngle / 270) * (max - min));
+      if (normalized <= 270) {
+        mappedValue = Math.round(min + (normalized / 270) * (max - min));
       } else {
-        if (servoAngle > 270 && servoAngle < 315) {
+        if (normalized > 270 && normalized < 315) {
           mappedValue = max;
         } else {
           mappedValue = min;
@@ -603,6 +660,18 @@ export default function DashboardBuilder({
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          {isConnected && (
+            <button 
+              onClick={() => sendData('J:0,0\n24\n')} 
+              className="btn"
+              style={{ height: '36px', background: '#dc2626', color: '#fff', border: '1px solid #991b1b', fontWeight: 'bold' }}
+              title="EMERGENCY STOP (Spacebar)"
+            >
+              <AlertTriangle size={16} style={{ marginRight: '0.3rem' }} />
+              E-STOP
+            </button>
+          )}
+
           <button 
             onClick={() => { setTargetSlotIndex(null); setShowAddModal(true); }} 
             className="btn btn-primary"
@@ -1427,51 +1496,23 @@ export default function DashboardBuilder({
               </div>
 
               {/* Action specific inputs */}
-              {(widgetType === 'button' || widgetType === 'toggle' || widgetType === 'slider' || widgetType === 'knob') && (() => {
-                const predefinedPayloads = ["SERVO:", "MOTA:", "MOTB:", "LED:", "BEEP:", "1", "0"];
-                const isCustomPayload = !predefinedPayloads.includes(widgetPayload);
-                return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                    <label style={{ fontSize: '0.8rem', color: 'var(--txt-secondary)' }}>
-                      Destino / Acción (Prefijo)
-                    </label>
-                    <select
-                      value={isCustomPayload ? "custom" : widgetPayload}
-                      onChange={(e) => {
-                        if (e.target.value === "custom") {
-                          setWidgetPayload("");
-                        } else {
-                          setWidgetPayload(e.target.value);
-                        }
-                      }}
-                      className="form-input"
-                      style={{ appearance: 'none', backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2394a3b8%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right .7rem top 50%', backgroundSize: '.65rem auto' }}
-                    >
-                      <option value="SERVO:">Servomotor (SERVO:)</option>
-                      <option value="MOTA:">Motor A (MOTA:)</option>
-                      <option value="MOTB:">Motor B (MOTB:)</option>
-                      <option value="LED:">LED / Foco (LED:)</option>
-                      <option value="BEEP:">Zumbador (BEEP:)</option>
-                      <option value="1">Señal Digital 1 (1)</option>
-                      <option value="0">Señal Digital 0 (0)</option>
-                      <option value="custom">-- Escribir Personalizado --</option>
-                    </select>
-                    {isCustomPayload && (
-                      <input
-                        type="text"
-                        value={widgetPayload}
-                        onChange={(e) => setWidgetPayload(e.target.value)}
-                        placeholder={t.widgetPayloadPlaceholder}
-                        className="form-input"
-                        style={{ marginTop: '0.25rem' }}
-                      />
-                    )}
-                    <span style={{ fontSize: '0.7rem', color: 'var(--txt-muted)', marginTop: '0.15rem', lineHeight: '1.3' }}>
-                      Selecciona qué componente en el Arduino recibirá este valor.
-                    </span>
-                  </div>
-                );
-              })()}
+              {(widgetType === 'button' || widgetType === 'toggle' || widgetType === 'slider' || widgetType === 'knob') && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  <label style={{ fontSize: '0.8rem', color: 'var(--txt-secondary)' }}>
+                    Destino / Acción (Prefijo)
+                  </label>
+                  <input
+                    type="text"
+                    value={widgetPayload}
+                    onChange={(e) => setWidgetPayload(e.target.value)}
+                    placeholder={t.widgetPayloadPlaceholder || "Ej: SERVO:, 1, L1_ON"}
+                    className="form-input"
+                  />
+                  <span style={{ fontSize: '0.7rem', color: 'var(--txt-muted)', marginTop: '0.15rem', lineHeight: '1.3' }}>
+                    Selecciona qué componente en el Arduino recibirá este valor.
+                  </span>
+                </div>
+              )}
 
               {/* Toggle off payload */}
               {widgetType === 'toggle' && (

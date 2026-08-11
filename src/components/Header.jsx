@@ -16,7 +16,8 @@ export default function Header({
   connect,
   disconnect,
   setSimulated,
-  isSupported
+  isSupported,
+  latency
 }) {
   const [spinLang, setSpinLang] = useState(false);
 
@@ -45,6 +46,11 @@ export default function Header({
           <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--txt-secondary)' }}>
             {isSimulated ? t.statusSimulated : isConnected ? t.statusConnected : isConnecting ? t.statusConnecting : t.statusDisconnected}
           </span>
+          {isConnected && !isSimulated && latency !== undefined && (
+            <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: latency < 100 ? '#10b981' : latency < 300 ? '#f59e0b' : '#ef4444', fontFamily: 'var(--font-mono)' }} title="Latencia de envío (Ping)">
+              {latency}ms
+            </span>
+          )}
         </div>
 
         {/* Connection Type Selector */}

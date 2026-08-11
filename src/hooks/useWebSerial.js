@@ -4,6 +4,14 @@ export function useWebSerial(onTelemetryReceived) {
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSimulated, setIsSimulated] = useState(false);
+  const [connectionLost, setConnectionLostState] = useState(false);
+  const connectionLostRef = useRef(false);
+
+  const setConnectionLost = (val) => {
+    setConnectionLostState(val);
+    connectionLostRef.current = val;
+  };
+
   const [connectionType, setConnectionTypeState] = useState(() => {
     return localStorage.getItem('edu_conn_type') || 'usb';
   }); // 'usb' | 'bluetooth'
@@ -13,6 +21,7 @@ export function useWebSerial(onTelemetryReceived) {
     return saved ? parseInt(saved, 10) : 9600;
   });
   const [logs, setLogs] = useState([]);
+  const [latency, setLatency] = useState(0);
 
   const setConnectionType = (type) => {
     setConnectionTypeState(type);
@@ -44,13 +53,45 @@ export function useWebSerial(onTelemetryReceived) {
     onTelemetryRef.current = onTelemetryReceived;
   }, [onTelemetryReceived]);
 
-  // Append a message to the logs
+  // Batching references to prevent React render flooding
+  const pendingLogs = useRef([]);
+  const pendingTelemetry = useRef({});
+  const batchIntervalRef = useRef(null);
+
+  useEffect(() => {
+    batchIntervalRef.current = setInterval(() => {
+      // Flush Logs
+      if (pendingLogs.current.length > 0) {
+        const newLogs = [...pendingLogs.current];
+        pendingLogs.current = [];
+        setLogs((prev) => {
+          const combined = [...prev, ...newLogs];
+          return combined.slice(-300);
+        });
+      }
+
+      // Flush Telemetry
+      if (Object.keys(pendingTelemetry.current).length > 0) {
+        if (onTelemetryRef.current) {
+          onTelemetryRef.current({ ...pendingTelemetry.current });
+        }
+        pendingTelemetry.current = {};
+      }
+    }, 150); // ~6 fps update rate
+
+    return () => clearInterval(batchIntervalRef.current);
+  }, []);
+
+  // Append a message to the logs queue
   const addLog = (type, text) => {
     const timestamp = new Date().toLocaleTimeString();
-    setLogs((prev) => [...prev.slice(-299), { type, text, timestamp }]); // Limit to last 300 logs
+    pendingLogs.current.push({ type, text, timestamp });
   };
 
-  const clearLogs = () => setLogs([]);
+  const clearLogs = () => {
+    pendingLogs.current = [];
+    setLogs([]);
+  };
 
   // Handle incoming data strings, parsing telemetries if present
   const processIncomingLine = (line) => {
@@ -87,9 +128,7 @@ export function useWebSerial(onTelemetryReceived) {
       }
 
       if (isTelemetry && Object.keys(data).length > 0) {
-        if (onTelemetryRef.current) {
-          onTelemetryRef.current(data);
-        }
+        pendingTelemetry.current = { ...pendingTelemetry.current, ...data };
       }
     }
   };
@@ -107,6 +146,7 @@ export function useWebSerial(onTelemetryReceived) {
     }
 
     setIsConnecting(true);
+    setConnectionLost(false);
     addLog('sys', 'Requesting serial port selection...');
     
     try {
@@ -198,6 +238,7 @@ export function useWebSerial(onTelemetryReceived) {
 
     addLog('sys', 'Disconnecting...');
     keepReadingRef.current = false;
+    setConnectionLost(false);
     
     if (readerRef.current) {
       try {
@@ -264,10 +305,12 @@ export function useWebSerial(onTelemetryReceived) {
     const writeTask = async () => {
       if (!portRef.current) return false;
       try {
+        const t0 = performance.now();
         const writer = portRef.current.writable.getWriter();
         const encoder = new TextEncoder();
         await writer.write(encoder.encode(formattedText));
         writer.releaseLock();
+        setLatency(Math.round(performance.now() - t0));
         return true;
       } catch (err) {
         console.error(err);
@@ -323,6 +366,79 @@ export function useWebSerial(onTelemetryReceived) {
     };
   }, []);
 
+  // Quick reconnect functionality
+  const reconnect = async () => {
+    if (!isSupported) return false;
+    setIsConnecting(true);
+    setConnectionLost(false);
+    addLog('sys', 'Intentando reconexión rápida...');
+    
+    try {
+      const ports = await navigator.serial.getPorts();
+      if (ports.length > 0) {
+        const port = ports[0];
+        portRef.current = port;
+        
+        await port.open({ baudRate });
+        
+        setIsConnected(true);
+        setIsConnecting(false);
+        setPortName('Arduino (Reconectado)');
+        addLog('sys', 'Reconexión exitosa.');
+        
+        keepReadingRef.current = true;
+        startReadingLoop(port);
+        return true;
+      } else {
+        throw new Error("No hay puertos previamente autorizados.");
+      }
+    } catch (err) {
+      console.error(err);
+      setIsConnecting(false);
+      setConnectionLost(true);
+      addLog('sys', `Error de reconexión: ${err.message}`);
+      return false;
+    }
+  };
+
+  // Listen for unexpected disconnects / reconnects
+  useEffect(() => {
+    if (!isSupported) return;
+
+    const handleDisconnect = (e) => {
+      // e.target is the SerialPort that disconnected
+      if (portRef.current && e.target === portRef.current) {
+        addLog('sys', '⚠️ ¡Conexión perdida inesperadamente! (Desconexión física)');
+        setIsConnected(false);
+        setConnectionLost(true);
+        setPortName(null);
+        portRef.current = null;
+        keepReadingRef.current = false;
+        
+        if (readerRef.current) {
+          readerRef.current.cancel().catch(() => {});
+        }
+      }
+    };
+
+    const handleConnect = (e) => {
+      if (connectionLostRef.current) {
+        addLog('sys', 'Dispositivo detectado nuevamente. Intentando reconectar en 1s...');
+        setTimeout(() => {
+          reconnect();
+        }, 1000);
+      }
+    };
+
+    navigator.serial.addEventListener('disconnect', handleDisconnect);
+    navigator.serial.addEventListener('connect', handleConnect);
+
+    return () => {
+      navigator.serial.removeEventListener('disconnect', handleDisconnect);
+      navigator.serial.removeEventListener('connect', handleConnect);
+    };
+  }, [isSupported, baudRate]); // Need baudRate so reconnect uses the latest
+
   return {
     isSupported,
     isConnected,
@@ -336,8 +452,11 @@ export function useWebSerial(onTelemetryReceived) {
     logs,
     connect,
     disconnect,
+    reconnect,
     sendData,
     clearLogs,
     setSimulated,
+    connectionLost,
+    latency,
   };
 }

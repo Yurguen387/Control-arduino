@@ -8,7 +8,7 @@ import SerialMonitor from './components/SerialMonitor';
 import ATConfigurator from './components/ATConfigurator';
 import ConnectionGuide from './components/ConnectionGuide';
 
-import { Sliders, Terminal, Settings, Code, Copy, Check, HelpCircle, MessageSquare } from 'lucide-react';
+import { Sliders, Terminal, Settings, Code, Copy, Check, HelpCircle, MessageSquare, AlertTriangle, Zap } from 'lucide-react';
 
 export default function App() {
   const [lang, setLang] = useState(() => {
@@ -66,7 +66,10 @@ export default function App() {
     disconnect,
     sendData,
     clearLogs,
-    setSimulated
+    setSimulated,
+    connectionLost,
+    reconnect,
+    latency
   } = useWebSerial((data) => {
     // onTelemetryReceived callback
     setTelemetryData(data);
@@ -100,6 +103,7 @@ export default function App() {
         disconnect={disconnect}
         setSimulated={setSimulated}
         isSupported={isSupported}
+        latency={latency}
       />
 
       {/* Tabs Navigation */}
@@ -131,6 +135,39 @@ export default function App() {
 
       </nav>
 
+      {/* Connection Lost Banner */}
+      {connectionLost && (
+        <div style={{
+          background: 'rgba(239, 68, 68, 0.1)',
+          border: '1px solid rgba(239, 68, 68, 0.3)',
+          borderLeft: '4px solid #ef4444',
+          margin: '1rem 1rem 0 1rem',
+          padding: '1rem',
+          borderRadius: '6px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <AlertTriangle color="#ef4444" size={24} />
+            <div>
+              <h4 style={{ margin: 0, color: '#ef4444', fontSize: '1rem', fontWeight: 'bold' }}>Conexión Perdida Inesperadamente</h4>
+              <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.85rem', color: 'var(--txt-secondary)' }}>
+                El módulo de Arduino se ha desconectado. Verifica el cable o batería.
+              </p>
+            </div>
+          </div>
+          <button 
+            onClick={reconnect} 
+            className="btn btn-primary"
+            style={{ background: '#ef4444', borderColor: '#ef4444', color: 'white', fontWeight: 'bold' }}
+            disabled={isConnecting}
+          >
+            <Zap size={16} />
+            {isConnecting ? 'Conectando...' : 'Reconectar Rápido'}
+          </button>
+        </div>
+      )}
 
       {/* Tab Contents */}
       <main style={{ flexGrow: 1 }}>

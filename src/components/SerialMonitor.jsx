@@ -143,10 +143,7 @@ export default function SerialMonitor({
         
         {logs
           .filter(log => {
-            // Ocultar strings de telemetría automática para mantener el serial "vacío"
-            if (log.type === 'in' && log.text.startsWith('d:') && log.text.includes('temp:')) {
-              return false;
-            }
+            // Se mantiene todo el log visible en el terminal para monitorear los sensores
             return true;
           })
           .map((log, index) => {
