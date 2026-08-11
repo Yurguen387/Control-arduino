@@ -140,6 +140,16 @@ export default function DashboardBuilder({
     let x = 0;
     let y = 0;
     let activeKeys = new Set();
+    let heartbeatInterval = null;
+
+    const startHeartbeat = (currentX, currentY) => {
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
+      if (currentX === 0 && currentY === 0) return; // Watchdog will naturally stop it
+      
+      heartbeatInterval = setInterval(() => {
+        sendData(`${prefix}${currentX},${currentY}`);
+      }, 200);
+    };
 
     const handleKeyDown = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
@@ -172,6 +182,7 @@ export default function DashboardBuilder({
       if (activeKeys.has(' ')) { x = 0; y = 0; } // STOP
 
       sendData(`${prefix}${x},${y}`);
+      startHeartbeat(x, y);
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -180,6 +191,7 @@ export default function DashboardBuilder({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
     };
   }, [isConnected, widgets, sendData]);
 
