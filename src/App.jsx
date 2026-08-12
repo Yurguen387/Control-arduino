@@ -68,8 +68,7 @@ export default function App() {
     clearLogs,
     setSimulated,
     connectionLost,
-    reconnect,
-    latency
+    reconnect
   } = useWebSerial((data) => {
     // onTelemetryReceived callback
     setTelemetryData(data);
@@ -103,7 +102,6 @@ export default function App() {
         disconnect={disconnect}
         setSimulated={setSimulated}
         isSupported={isSupported}
-        latency={latency}
       />
 
       {/* Tabs Navigation */}
@@ -153,19 +151,10 @@ export default function App() {
             <div>
               <h4 style={{ margin: 0, color: '#ef4444', fontSize: '1rem', fontWeight: 'bold' }}>Conexión Perdida Inesperadamente</h4>
               <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.85rem', color: 'var(--txt-secondary)' }}>
-                El módulo de Arduino se ha desconectado. Verifica el cable o batería.
+                El módulo de Arduino se ha desconectado. Verifica el cable o batería y vuelve a presionar el botón "Conectar" en el panel superior.
               </p>
             </div>
           </div>
-          <button 
-            onClick={reconnect} 
-            className="btn btn-primary"
-            style={{ background: '#ef4444', borderColor: '#ef4444', color: 'white', fontWeight: 'bold' }}
-            disabled={isConnecting}
-          >
-            <Zap size={16} />
-            {isConnecting ? 'Conectando...' : 'Reconectar Rápido'}
-          </button>
         </div>
       )}
 

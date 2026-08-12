@@ -21,7 +21,6 @@ export function useWebSerial(onTelemetryReceived) {
     return saved ? parseInt(saved, 10) : 9600;
   });
   const [logs, setLogs] = useState([]);
-  const [latency, setLatency] = useState(0);
 
   const setConnectionType = (type) => {
     setConnectionTypeState(type);
@@ -304,18 +303,20 @@ export function useWebSerial(onTelemetryReceived) {
 
     const writeTask = async () => {
       if (!portRef.current) return false;
+      let writer;
       try {
-        const t0 = performance.now();
-        const writer = portRef.current.writable.getWriter();
+        writer = portRef.current.writable.getWriter();
         const encoder = new TextEncoder();
         await writer.write(encoder.encode(formattedText));
-        writer.releaseLock();
-        setLatency(Math.round(performance.now() - t0));
         return true;
       } catch (err) {
         console.error(err);
         addLog('sys', `Write error: ${err.message}`);
         return false;
+      } finally {
+        if (writer) {
+          writer.releaseLock();
+        }
       }
     };
 
@@ -457,6 +458,5 @@ export function useWebSerial(onTelemetryReceived) {
     clearLogs,
     setSimulated,
     connectionLost,
-    latency,
   };
 }

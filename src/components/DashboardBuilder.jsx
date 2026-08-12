@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Plus, Download, Upload, X, Trash2, Sliders, ToggleLeft, 
   Thermometer, Activity, Gauge, Lightbulb, Send, Type, Compass,
-  AlertTriangle, Navigation, Zap, Volume2, Shield, Pencil
+  AlertTriangle, Navigation, Zap, Volume2, Shield, Pencil, Gamepad2, Radio
 } from 'lucide-react';
 
 export default function DashboardBuilder({
@@ -24,6 +24,9 @@ export default function DashboardBuilder({
   const [widgetPayloadOff, setWidgetPayloadOff] = useState('');
   const [widgetMin, setWidgetMin] = useState(0);
   const [widgetMax, setWidgetMax] = useState(180);
+  const [widgetBindUp, setWidgetBindUp] = useState('');
+  const [widgetBindDown, setWidgetBindDown] = useState('');
+  const [widgetBindKey, setWidgetBindKey] = useState('');
   const [widgetTelemetryKey, setWidgetTelemetryKey] = useState('');
   const [widgetTelemetryKey2, setWidgetTelemetryKey2] = useState('');
   const [widgetColor, setWidgetColor] = useState('var(--clr-cyan)');
@@ -51,6 +54,9 @@ export default function DashboardBuilder({
     setWidgetPayloadOff(widget.payloadOff || '');
     setWidgetMin(widget.min !== undefined ? widget.min : 0);
     setWidgetMax(widget.max !== undefined ? widget.max : 180);
+    setWidgetBindUp(widget.bindUp || '');
+    setWidgetBindDown(widget.bindDown || '');
+    setWidgetBindKey(widget.bindKey || '');
     setWidgetTelemetryKey(widget.telemetryKey || '');
     setWidgetTelemetryKey2(widget.telemetryKey2 || '');
     setWidgetColor(widget.color || 'var(--clr-cyan)');
@@ -66,6 +72,9 @@ export default function DashboardBuilder({
     setWidgetPayloadOff('');
     setWidgetMin(0);
     setWidgetMax(180);
+    setWidgetBindUp('');
+    setWidgetBindDown('');
+    setWidgetBindKey('');
     setWidgetTelemetryKey('');
     setWidgetTelemetryKey2('');
     setWidgetColor('var(--clr-cyan)');
@@ -128,72 +137,6 @@ export default function DashboardBuilder({
       return updated;
     });
   }, [telemetryData]);
-
-  // Gamepad / Keyboard control effect for Joystick
-  useEffect(() => {
-    if (!isConnected) return;
-    
-    const joystick = widgets.find(w => w.type === 'joystick');
-    if (!joystick) return;
-
-    const prefix = joystick.payload || 'J:';
-    let x = 0;
-    let y = 0;
-    let activeKeys = new Set();
-    let heartbeatInterval = null;
-
-    const startHeartbeat = (currentX, currentY) => {
-      if (heartbeatInterval) clearInterval(heartbeatInterval);
-      if (currentX === 0 && currentY === 0) return; // Watchdog will naturally stop it
-      
-      heartbeatInterval = setInterval(() => {
-        sendData(`${prefix}${currentX},${currentY}`);
-      }, 200);
-    };
-
-    const handleKeyDown = (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-      
-      const key = e.key.toLowerCase();
-      if (['w', 'a', 's', 'd', ' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
-        if (!activeKeys.has(key)) {
-          activeKeys.add(key);
-          updateMovement();
-        }
-        if (key === ' ' || key.startsWith('arrow')) e.preventDefault();
-      }
-    };
-
-    const handleKeyUp = (e) => {
-      const key = e.key.toLowerCase();
-      if (activeKeys.has(key)) {
-        activeKeys.delete(key);
-        updateMovement();
-      }
-    };
-
-    const updateMovement = () => {
-      x = 0;
-      y = 0;
-      if (activeKeys.has('w') || activeKeys.has('arrowup')) y = 100;
-      if (activeKeys.has('s') || activeKeys.has('arrowdown')) y = -100;
-      if (activeKeys.has('d') || activeKeys.has('arrowright')) x = 100;
-      if (activeKeys.has('a') || activeKeys.has('arrowleft')) x = -100;
-      if (activeKeys.has(' ')) { x = 0; y = 0; } // STOP
-
-      sendData(`${prefix}${x},${y}`);
-      startHeartbeat(x, y);
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-      if (heartbeatInterval) clearInterval(heartbeatInterval);
-    };
-  }, [isConnected, widgets, sendData]);
 
   // Export widgets layout to JSON file
   const exportLayout = () => {
@@ -293,6 +236,8 @@ export default function DashboardBuilder({
             baseWidget.max = Number(widgetMax);
           } else if (widgetType === 'knob') {
             baseWidget.payload = widgetPayload || 'SERVO:';
+            baseWidget.bindUp = widgetBindUp.toLowerCase();
+            baseWidget.bindDown = widgetBindDown.toLowerCase();
           } else if (widgetType === 'joystick') {
             baseWidget.payload = widgetPayload || 'J:';
           } else if (widgetType === 'motor') {
@@ -357,6 +302,8 @@ export default function DashboardBuilder({
       } else if (widgetType === 'knob') {
         newWidget.payload = widgetPayload || 'SERVO:';
         newWidget.currentVal = 0;
+        newWidget.bindUp = widgetBindUp.toLowerCase();
+        newWidget.bindDown = widgetBindDown.toLowerCase();
       } else if (widgetType === 'joystick') {
         newWidget.payload = widgetPayload || 'J:';
         newWidget.telemetryKey = widgetTelemetryKey || 'joyx';
@@ -463,6 +410,142 @@ export default function DashboardBuilder({
   // Joystick dragging state references
   const joystickRefs = useRef({});
   const activeJoystickId = useRef(null);
+  const [isEmergencyStop, setIsEmergencyStop] = useState(false);
+  const emergencyStopRef = useRef(false);
+
+  // --- REAL-TIME WASD KEYBOARD CONTROL ---
+  const activeKeys = useRef(new Set());
+  const widgetsRef = useRef(widgets);
+  
+  useEffect(() => {
+    widgetsRef.current = widgets;
+  }, [widgets]);
+
+  useEffect(() => {
+    if (!isConnected) return;
+    
+    const sendWASDCommand = () => {
+      if (emergencyStopRef.current) return;
+      let x = 0;
+      let y = 0;
+      
+      if (activeKeys.current.has('arrowup')) y = 100;
+      if (activeKeys.current.has('arrowdown')) y = -100;
+      if (activeKeys.current.has('arrowright')) x = 100;
+      if (activeKeys.current.has('arrowleft')) x = -100;
+
+      const joyWidget = widgetsRef.current.find(w => w.type === 'joystick');
+      if (joyWidget) {
+        // Visual mapping: 100% = 24px. DOM Up is negative.
+        joystickRefs.current[joyWidget.id] = { x: (x / 100) * 24, y: (-y / 100) * 24 }; 
+        setWidgets([...widgetsRef.current]);
+        
+        const prefix = joyWidget.payload || 'J:';
+        sendData(`${prefix}${x},${y}`);
+      } else {
+        // Fallback standard J: command if no widget exists
+        sendData(`J:${x},${y}`);
+      }
+    };
+
+    const handleKeyDown = (e) => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+      const key = e.key.toLowerCase();
+
+      if (key === ' ') {
+        e.preventDefault();
+        if (!emergencyStopRef.current) {
+          emergencyStopRef.current = true;
+          setIsEmergencyStop(true);
+          activeKeys.current.clear();
+          sendData('J:0,0');
+        } else {
+          emergencyStopRef.current = false;
+          setIsEmergencyStop(false);
+        }
+        return;
+      }
+
+      if (emergencyStopRef.current) return;
+
+      // Generic bindings check (Button/Toggle)
+      const boundWidget = widgetsRef.current.find(w => (w.type === 'button' || w.type === 'toggle') && w.bindKey === key);
+      if (boundWidget && isConnected) {
+        if (!activeKeys.current.has(key)) {
+          activeKeys.current.add(key);
+          if (boundWidget.type === 'button') {
+            handleButtonClick(boundWidget);
+          } else if (boundWidget.type === 'toggle') {
+            handleToggleChange(boundWidget);
+          }
+        }
+        return;
+      }
+
+      // Knob bindings check
+      const boundKnob = widgetsRef.current.find(w => w.type === 'knob' && (w.bindUp === key || w.bindDown === key));
+      if (boundKnob) {
+        if (!activeKeys.current.has(key)) {
+          activeKeys.current.add(key);
+          const kMin = boundKnob.min !== undefined ? boundKnob.min : 0;
+          const kMax = boundKnob.max !== undefined ? boundKnob.max : 180;
+          let step = Math.max(1, Math.round((kMax - kMin) / 20));
+          let newVal = boundKnob.currentVal !== undefined ? boundKnob.currentVal : kMin;
+          if (boundKnob.bindUp === key) newVal += step;
+          if (boundKnob.bindDown === key) newVal -= step;
+          if (newVal > kMax) newVal = kMax;
+          if (newVal < kMin) newVal = kMin;
+          handleSliderChange(boundKnob.id, boundKnob.payload, newVal);
+        }
+        return; // Don't process arrows if it was a knob binding
+      }
+
+      if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+        if (!activeKeys.current.has(key)) {
+          activeKeys.current.add(key);
+          sendWASDCommand();
+        }
+      }
+    };
+    
+    const handleKeyUp = (e) => {
+      const key = e.key.toLowerCase();
+
+      const boundWidget = widgetsRef.current.find(w => (w.type === 'button' || w.type === 'toggle') && w.bindKey === key);
+      if (boundWidget) {
+        activeKeys.current.delete(key);
+        return;
+      }
+
+      const boundKnob = widgetsRef.current.find(w => w.type === 'knob' && (w.bindUp === key || w.bindDown === key));
+      if (boundKnob) {
+        activeKeys.current.delete(key);
+        return;
+      }
+
+      if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+        activeKeys.current.delete(key);
+        sendWASDCommand();
+      }
+    };
+    
+    const handleBlur = () => {
+      if (activeKeys.current.size > 0) {
+        activeKeys.current.clear();
+        sendWASDCommand();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, [isConnected, sendData]);
+
 
   const startJoystickDrag = (e, id) => {
     if (!isConnected) return;
@@ -478,7 +561,7 @@ export default function DashboardBuilder({
     activeJoystickId.current = id;
 
     const moveHandler = (ev) => {
-      if (!activeJoystickId.current) return;
+      if (emergencyStopRef.current || !activeJoystickId.current) return;
       if (ev.cancelable) ev.preventDefault();
       updateJoystickPosition(ev);
     };
@@ -565,7 +648,7 @@ export default function DashboardBuilder({
       const { scaleX: fX, scaleY: fY } = throttleTimers.current.latestValues[id];
       await sendData(`${prefix}${fX},${fY}`);
       delete throttleTimers.current[id];
-    }, 60);
+    }, 200);
   };
 
   // Radial Dial handler for Servo
@@ -662,6 +745,23 @@ export default function DashboardBuilder({
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       
       {/* Dashboard Top Settings */}
+      {isEmergencyStop && (
+        <div style={{
+          background: 'rgba(239, 68, 68, 0.1)',
+          border: '2px dashed #ef4444',
+          color: '#ef4444',
+          padding: '1rem',
+          borderRadius: '8px',
+          textAlign: 'center',
+          fontWeight: 'bold',
+          fontSize: '1.2rem',
+          animation: 'pulse-glow 1s infinite'
+        }}>
+          FRENO DE EMERGENCIA ACTIVADO<br/>
+          <span style={{ fontSize: '0.85rem', fontWeight: 'normal', color: 'var(--txt-secondary)' }}>Presiona la BARRA ESPACIADORA de nuevo para desbloquear.</span>
+        </div>
+      )}
+
       <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
         <div>
           <h2 style={{ fontSize: '1.25rem', color: 'var(--clr-cyan)', fontFamily: 'var(--font-display)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -672,18 +772,6 @@ export default function DashboardBuilder({
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-          {isConnected && (
-            <button 
-              onClick={() => sendData('J:0,0\n24\n')} 
-              className="btn"
-              style={{ height: '36px', background: '#dc2626', color: '#fff', border: '1px solid #991b1b', fontWeight: 'bold' }}
-              title="EMERGENCY STOP (Spacebar)"
-            >
-              <AlertTriangle size={16} style={{ marginRight: '0.3rem' }} />
-              E-STOP
-            </button>
-          )}
-
           <button 
             onClick={() => { setTargetSlotIndex(null); setShowAddModal(true); }} 
             className="btn btn-primary"
@@ -759,7 +847,7 @@ export default function DashboardBuilder({
             textShadow: '0 0 3px var(--clr-green)'
           }}
         >
-          📡 RX STREAM:
+          RX STREAM:
         </span>
         <div 
           style={{ 
@@ -880,7 +968,6 @@ export default function DashboardBuilder({
                   onTouchStart={() => { dragStartFromHeader.current = true; }}
                 >
                   <span className="widget-title" style={{ fontSize: '0.85rem', fontWeight: 600 }}>
-                    {renderIcon(widget.icon, accentColor)}
                     {widget.title}
                   </span>
                   
@@ -951,7 +1038,7 @@ export default function DashboardBuilder({
                         </svg>
                       </div>
                       <div className="label-tape red" style={{ marginTop: '0.2rem', maxWidth: '90%', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        🚀 {widget.payload}
+                        {widget.payload}
                       </div>
                     </div>
                   )}
@@ -1006,8 +1093,11 @@ export default function DashboardBuilder({
                           )}
                         </svg>
                       </div>
-                      <div className={`label-tape ${widget.isToggled ? 'green' : 'yellow'}`} style={{ marginTop: '0.2rem' }}>
-                        🚀 {widget.isToggled ? widget.payload : widget.payloadOff}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.2rem' }}>
+                        <div className={`label-tape ${widget.isToggled ? 'green' : 'yellow'}`}>
+                          {widget.isToggled ? widget.payload : widget.payloadOff}
+                        </div>
+                        {widget.bindKey && <span style={{ fontSize: '0.55rem', background: 'rgba(0,0,0,0.5)', padding: '2px 4px', borderRadius: '4px', color: '#fff' }}>[{widget.bindKey.toUpperCase()}]</span>}
                       </div>
                     </div>
                   )}
@@ -1017,10 +1107,10 @@ export default function DashboardBuilder({
                     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '0 0.5rem' }}>
                         <div className="lcd-display" style={{ minWidth: '70px', fontSize: '0.85rem' }}>
-                          📟 {widget.currentVal !== undefined ? widget.currentVal : widget.min}
+                          {widget.currentVal !== undefined ? widget.currentVal : widget.min}
                         </div>
                         <div className="label-tape" style={{ fontSize: '0.6rem' }}>
-                          🚀 {widget.payload}{widget.currentVal !== undefined ? widget.currentVal : widget.min}
+                          {widget.payload}{widget.currentVal !== undefined ? widget.currentVal : widget.min}
                         </div>
                       </div>
                       <div style={{ width: '100%', padding: '0 0.5rem', display: 'flex', alignItems: 'center', position: 'relative', height: '40px' }}>
@@ -1050,7 +1140,7 @@ export default function DashboardBuilder({
                   {widget.type === 'text_input' && (
                     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
                       <div className="lcd-display blue" style={{ width: '100%', fontSize: '0.7rem', justifyContent: 'flex-start', height: '24px' }}>
-                        ⚙️ SEND_CMD:
+                        SEND_CMD:
                       </div>
                       <div style={{ display: 'flex', width: '100%', gap: '0.4rem', alignItems: 'center' }}>
                         <input
@@ -1098,7 +1188,7 @@ export default function DashboardBuilder({
                             boxShadow: '0 3px 0 #92400e'
                           }}
                         >
-                          ✈️
+                          
                         </button>
                       </div>
                     </div>
@@ -1109,7 +1199,7 @@ export default function DashboardBuilder({
                     <div style={{ display: 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flexGrow: 1, alignItems: 'flex-start' }}>
                         <span className="label-tape yellow" style={{ fontSize: '0.55rem' }}>
-                          📟 {(widget.telemetryKey || '???').toUpperCase()}
+                          {(widget.telemetryKey || '???').toUpperCase()}
                         </span>
                         <div className="lcd-display" style={{ fontSize: '1.2rem', padding: '0.4rem 0.8rem', marginTop: '0.2rem' }}>
                           {telemetryData && telemetryData[widget.telemetryKey] !== undefined 
@@ -1182,13 +1272,13 @@ export default function DashboardBuilder({
                           </svg>
                         ) : (
                           <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', color: '#10b981', fontFamily: 'var(--font-mono)', letterSpacing: '0.1em' }}>
-                            🔊 ESPERANDO DATOS...
+                            ESPERANDO DATOS...
                           </div>
                         )}
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
                         <div className="label-tape" style={{ fontSize: '0.55rem' }}>
-                          📊 OSCILLOSCOPE: {widget.telemetryKey}
+                          OSCILLOSCOPE: {widget.telemetryKey}
                         </div>
                         <div className="lcd-display" style={{ fontSize: '0.7rem', padding: '0.1rem 0.4rem' }}>
                           VAL: {chartsHistory[widget.telemetryKey] && chartsHistory[widget.telemetryKey].length > 0 
@@ -1232,13 +1322,13 @@ export default function DashboardBuilder({
                         return (
                           <>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', flexGrow: 1 }}>
-                              <span className="label-tape" style={{ fontSize: '0.55rem' }}>🕹️ JOYSTICK XY</span>
+                              <span className="label-tape" style={{ fontSize: '0.55rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Gamepad2 size={12} /> JOYSTICK XY</span>
                               <div className="lcd-display" style={{ fontSize: '0.7rem', padding: '0.2rem 0.4rem', marginTop: '0.1rem', display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-start', minWidth: '75px' }}>
                                 <div>X: {labelX}</div>
                                 <div>Y: {labelY}</div>
                               </div>
                               <span style={{ fontSize: '0.55rem', color: 'var(--txt-muted)' }}>
-                                {isPhysical ? 'Modo: FÍSICO' : `🚀 ${widget.payload}${labelX},${labelY}`}
+                                {isPhysical ? 'Modo: FÍSICO' : `${widget.payload}${labelX},${labelY}`}
                               </span>
                             </div>
                             
@@ -1511,17 +1601,37 @@ export default function DashboardBuilder({
               {(widgetType === 'button' || widgetType === 'toggle' || widgetType === 'slider' || widgetType === 'knob') && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                   <label style={{ fontSize: '0.8rem', color: 'var(--txt-secondary)' }}>
-                    Destino / Acción (Prefijo)
+                    {widgetType === 'toggle' ? 'Dato al encender' : 'Destino / Acción (Prefijo)'}
                   </label>
                   <input
                     type="text"
                     value={widgetPayload}
                     onChange={(e) => setWidgetPayload(e.target.value)}
-                    placeholder={t.widgetPayloadPlaceholder || "Ej: SERVO:, 1, L1_ON"}
+                    placeholder={widgetType === 'toggle' ? "Ej: L1_ON, 1, etc." : (t.widgetPayloadPlaceholder || "Ej: SERVO:, 1, L1_ON")}
                     className="form-input"
                   />
                   <span style={{ fontSize: '0.7rem', color: 'var(--txt-muted)', marginTop: '0.15rem', lineHeight: '1.3' }}>
-                    Selecciona qué componente en el Arduino recibirá este valor.
+                    {widgetType === 'toggle' 
+                      ? 'El dato que se enviará al encender el interruptor (ej: "1" o "L1_ON").'
+                      : 'Selecciona qué componente en el Arduino recibirá este valor.'}
+                  </span>
+                </div>
+              )}
+
+              {/* Single Key Bind */}
+              {(widgetType === 'button' || widgetType === 'toggle') && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  <label style={{ fontSize: '0.8rem', color: 'var(--txt-secondary)' }}>Tecla Asignada (Atajo)</label>
+                  <input
+                    type="text"
+                    value={widgetBindKey}
+                    onChange={(e) => setWidgetBindKey(e.target.value.toLowerCase())}
+                    placeholder="Ej: f"
+                    maxLength={1}
+                    className="form-input"
+                  />
+                  <span style={{ fontSize: '0.7rem', color: 'var(--txt-muted)', marginTop: '0.15rem', lineHeight: '1.3' }}>
+                    Si asignas una letra, al presionarla en el teclado se activará este control.
                   </span>
                 </div>
               )}
@@ -1566,6 +1676,37 @@ export default function DashboardBuilder({
                   </div>
                   <div style={{ gridColumn: 'span 2', fontSize: '0.7rem', color: 'var(--txt-muted)', marginTop: '0.15rem', lineHeight: '1.3' }}>
                     {t.helpRanges}
+                  </div>
+                </div>
+              )}
+
+              {/* Knob Key Bindings */}
+              {widgetType === 'knob' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <label style={{ fontSize: '0.8rem', color: 'var(--txt-secondary)' }}>Tecla Subir</label>
+                    <input
+                      type="text"
+                      value={widgetBindUp}
+                      onChange={(e) => setWidgetBindUp(e.target.value.toLowerCase())}
+                      placeholder="Ej: q"
+                      maxLength={1}
+                      className="form-input"
+                    />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <label style={{ fontSize: '0.8rem', color: 'var(--txt-secondary)' }}>Tecla Bajar</label>
+                    <input
+                      type="text"
+                      value={widgetBindDown}
+                      onChange={(e) => setWidgetBindDown(e.target.value.toLowerCase())}
+                      placeholder="Ej: e"
+                      maxLength={1}
+                      className="form-input"
+                    />
+                  </div>
+                  <div style={{ gridColumn: 'span 2', fontSize: '0.7rem', color: 'var(--txt-muted)', marginTop: '0.15rem', lineHeight: '1.3' }}>
+                    Asigna dos letras (Ej: q y e) para controlar el potenciómetro desde el teclado.
                   </div>
                 </div>
               )}
