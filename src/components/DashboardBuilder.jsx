@@ -227,9 +227,11 @@ export default function DashboardBuilder({
 
           if (widgetType === 'button') {
             baseWidget.payload = widgetPayload;
+            baseWidget.bindKey = widgetBindKey.toLowerCase();
           } else if (widgetType === 'toggle') {
             baseWidget.payload = widgetPayload;
             baseWidget.payloadOff = widgetPayloadOff;
+            baseWidget.bindKey = widgetBindKey.toLowerCase();
           } else if (widgetType === 'slider') {
             baseWidget.payload = widgetPayload;
             baseWidget.min = Number(widgetMin);
